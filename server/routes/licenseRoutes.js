@@ -11,9 +11,11 @@ const { DURATION_KEYS } = require('../utils/licenseDates');
 
 const router = express.Router();
 
+// `values: 'falsy'` matters: a form posts an untouched field as '', not as
+// undefined, so a plain .optional() would still fail it on .notEmpty().
 const text = (field, label, { max = 120, optional = false } = {}) => {
   const chain = body(field);
-  return (optional ? chain.optional() : chain)
+  return (optional ? chain.optional({ values: 'falsy' }) : chain)
     .trim()
     .escape()
     .notEmpty()
@@ -65,9 +67,11 @@ router.get('/', controller.list);
 router.post(
   '/',
   [
-    text('clientName', 'Client name', { optional: true }),
+    text('clientName', 'Client name'),
     text('companyName', 'Company name', { optional: true }),
-    text('clientUserId', 'Client'),
+    // Optional: it links the license to a client account for the product
+    // login. A license may instead name a client who has no account.
+    text('clientUserId', 'Client user ID', { optional: true }),
     text('productName', 'Product name'),
     text('soldBy', 'Sold by'),
     duration(),

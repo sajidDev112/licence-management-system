@@ -9,6 +9,7 @@ import { DURATIONS, formatDate, previewExpiry, toDateInput } from '../services/f
 const today = () => new Date().toISOString().slice(0, 10)
 
 const EMPTY = {
+  clientName: '',
   clientUserId: '',
   productName: '',
   soldBy: '',
@@ -19,7 +20,7 @@ const EMPTY = {
 
 function validateForm(values) {
   const errors = {}
-  if (!values.clientUserId.trim()) errors.clientUserId = 'Select a client'
+  if (!values.clientName.trim()) errors.clientName = 'Client name is required'
   if (!values.productName.trim()) errors.productName = 'Product name is required'
   if (!values.soldBy.trim()) errors.soldBy = 'Sold by is required'
   if (!values.startDate) errors.startDate = 'Start date is required'
@@ -44,7 +45,6 @@ export default function LicenseFormModal({
   open,
   license,
   products = [],
-  clients = [],
   onClose,
   onSubmit,
 }) {
@@ -60,6 +60,7 @@ export default function LicenseFormModal({
     setValues(
       license
         ? {
+            clientName: license.clientName || '',
             clientUserId: license.clientUserId || '',
             productName: license.productName || '',
             soldBy: license.soldBy || '',
@@ -75,8 +76,6 @@ export default function LicenseFormModal({
     setValues((prev) => ({ ...prev, [name]: value }))
     setErrors((prev) => ({ ...prev, [name]: undefined }))
   }
-
-  const selected = clients.find((c) => c.username === values.clientUserId)
 
   // For a preset duration the expiry is derived; the field becomes read-only.
   const computedExpiry = useMemo(
@@ -95,7 +94,11 @@ export default function LicenseFormModal({
     setSubmitting(true)
     try {
       await onSubmit({
-        clientUserId: values.clientUserId.trim(),
+        clientName: values.clientName.trim(),
+        // Only sent when the license already has one. It links the license to a
+        // client account for the product login, and the form no longer asks for
+        // it, so a new license simply has none.
+        ...(values.clientUserId.trim() ? { clientUserId: values.clientUserId.trim() } : {}),
         productName: values.productName.trim(),
         soldBy: values.soldBy.trim(),
         duration: values.duration,
@@ -168,77 +171,54 @@ export default function LicenseFormModal({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="clientUserId">
-              Client <span className="text-red-500">*</span>
+            <label className="label" htmlFor="clientName">
+              Client Name <span className="text-red-500">*</span>
             </label>
-            {clients.length ? (
-              <select
-                id="clientUserId"
-                className={`input ${errors.clientUserId ? 'border-red-400' : ''}`}
-                value={values.clientUserId}
-                onChange={(e) => setField('clientUserId', e.target.value)}
-              >
-                <option value="">Select a client</option>
-                {/* An older license may name a client that was since removed. */}
-                {values.clientUserId &&
-                  !clients.some((c) => c.username === values.clientUserId) && (
-                    <option value={values.clientUserId}>{values.clientUserId}</option>
-                  )}
-                {clients.map((c) => (
-                  <option key={c.username} value={c.username}>
-                    {c.clientName}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                id="clientUserId"
-                className={`input ${errors.clientUserId ? 'border-red-400' : ''}`}
-                placeholder="john.doe or john@abc.com"
-                value={values.clientUserId}
-                onChange={(e) => setField('clientUserId', e.target.value)}
-              />
-            )}
-            {fieldError('clientUserId')}
-            {/* {selected && (
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {selected.companyName}
-              </p>
-            )} */}
+            {/* Typed freely rather than picked from a list: this exact name is
+                what the Licenses table and the Clients page show. */}
+            <input
+              id="clientName"
+              className={`input ${errors.clientName ? 'border-red-400' : ''}`}
+              placeholder="Name of the client"
+              value={values.clientName}
+              onChange={(e) => setField('clientName', e.target.value)}
+            />
+            {fieldError('clientName')}
           </div>
 
           <div>
             <label className="label" htmlFor="productName">
               Product Name <span className="text-red-500">*</span>
             </label>
-            {products.length ? (
-              <select
-                id="productName"
-                className={`input ${errors.productName ? 'border-red-400' : ''}`}
-                value={values.productName}
-                onChange={(e) => setField('productName', e.target.value)}
-              >
-                <option value="">Select a product</option>
-                {/* An older license may name a product that has since been removed. */}
-                {values.productName && !products.some((p) => p.name === values.productName) && (
-                  <option value={values.productName}>{values.productName}</option>
-                )}
-                {products.map((p) => (
-                  <option key={p.id} value={p.name}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                id="productName"
-                className={`input ${errors.productName ? 'border-red-400' : ''}`}
-                placeholder="My Product"
-                value={values.productName}
-                onChange={(e) => setField('productName', e.target.value)}
-              />
-            )}
+            {/* Always a dropdown of the products on the Products page. It used
+                to fall back to a free text box when the list came back empty,
+                which silently turned a load failure into a typo waiting to
+                happen — a license must name a product exactly. */}
+            <select
+              id="productName"
+              className={`input ${errors.productName ? 'border-red-400' : ''}`}
+              value={values.productName}
+              onChange={(e) => setField('productName', e.target.value)}
+              disabled={!products.length}
+            >
+              <option value="">{products.length ? 'Select a product' : 'No products yet'}</option>
+              {/* An older license may name a product that has since been removed. */}
+              {values.productName && !products.some((p) => p.name === values.productName) && (
+                <option value={values.productName}>{values.productName}</option>
+              )}
+              {products.map((p) => (
+                <option key={p.id} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
             {fieldError('productName')}
+            {!products.length && (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                No products loaded. Add one on the Products page, or reload if the
+                server was restarting.
+              </p>
+            )}
           </div>
 
           <div className="sm:col-span-2">

@@ -212,9 +212,14 @@ const server = app.listen(0, async () => {
       (await call('POST', '/api/licenses', newLicense({ duration: 'custom', expiryDate: undefined }))).status === 400)
     check('rejects an unknown duration',
       (await call('POST', '/api/licenses', newLicense({ duration: '99_years' }))).status === 400)
-    check('rejects a missing client user id',
-      (await call('POST', '/api/licenses', newLicense({ clientUserId: '' }))).status === 400)
-    check('rejects a client with neither an account nor a name supplied',
+    // A form posts an untouched field as '', not as undefined. The optional
+    // fields have to tolerate that, or the form cannot submit at all.
+    const blankUserId = await call('POST', '/api/licenses', newLicense({ clientUserId: '' }))
+    check('accepts a blank client user id', blankUserId.status === 201, blankUserId.body)
+    await call('DELETE', `/api/licenses/${blankUserId.body.license.id}`)
+    check('rejects a blank client name',
+      (await call('POST', '/api/licenses', newLicense({ clientName: '' }))).status === 400)
+    check('rejects a license with no client name at all',
       (await call('POST', '/api/licenses', {
         clientUserId: 'ghost.user', productName: 'My Product', soldBy: 'Alex Seller',
         duration: '1_year', startDate: '2020-01-01',
@@ -363,17 +368,36 @@ const server = app.listen(0, async () => {
     check('the client list carries the readable password',
       johnNow.password === 'ClientPass123', johnNow.password)
 
-    // The license form only sends the client; the account fills in the rest.
-    const fromAccount = await call('POST', '/api/licenses', {
-      clientUserId: 'john.doe', productName: 'My Product', soldBy: 'Alex Seller',
+    // The name typed on the form is what the license keeps, even when the
+    // user ID matches an account with a different name on it.
+    const typedName = await call('POST', '/api/licenses', {
+      clientName: 'Johnny D', clientUserId: 'john.doe', productName: 'My Product',
+      soldBy: 'Alex Seller', duration: '1_year', startDate: '2020-01-01',
+    })
+    check('a license keeps the client name it was given',
+      typedName.status === 201 && typedName.body.license.clientName === 'Johnny D',
+      typedName.body)
+    check('a linked account only fills in what was left blank',
+      typedName.body.license.companyName === 'ABC Pvt Ltd')
+    await call('DELETE', `/api/licenses/${typedName.body.license.id}`)
+
+    // No user ID at all: the license names a client who has no account.
+    const nameOnly = await call('POST', '/api/licenses', {
+      clientName: 'Walk-in Buyer', productName: 'My Product', soldBy: 'Alex Seller',
       duration: '1_year', startDate: '2020-01-01',
     })
-    check('a license takes its client name from the account',
-      fromAccount.status === 201 && fromAccount.body.license.clientName === 'John Doe',
-      fromAccount.body)
-    check('and its company from the account',
-      fromAccount.body.license.companyName === 'ABC Pvt Ltd')
-    await call('DELETE', `/api/licenses/${fromAccount.body.license.id}`)
+    check('a license can be created with just a client name',
+      nameOnly.status === 201 && nameOnly.body.license.clientName === 'Walk-in Buyer',
+      nameOnly.body)
+    check('and it still appears on the Clients page',
+      (await call('GET', '/api/clients')).body.clients
+        .some((c) => c.clientName === 'Walk-in Buyer'))
+    const noName = await call('POST', '/api/licenses', {
+      productName: 'My Product', soldBy: 'Alex Seller',
+      duration: '1_year', startDate: '2020-01-01',
+    })
+    check('but a client name is required', noName.status === 400, noName.body)
+    await call('DELETE', `/api/licenses/${nameOnly.body.license.id}`)
 
     console.log('\n-- product login --')
     const badUser = await call('POST', '/api/clients/login',
@@ -433,9 +457,10 @@ const server = app.listen(0, async () => {
     console.log('\n-- update + delete --')
     const upd = await call('PUT', `/api/licenses/${lic.id}`, { soldBy: 'Dana Seller', duration: '1_month' })
     check('updates fields', upd.body.license.soldBy === 'Dana Seller', upd.body)
-    // john.doe has a client account by this point, and it is authoritative.
-    check('the client account supplies the name, not the license',
-      upd.body.license.clientName === 'Jonathan Doe', upd.body.license.clientName)
+    // john.doe has a client account with a different name on it by this point;
+    // the name stored on the license is still the one that shows.
+    check('the license keeps its own client name',
+      upd.body.license.clientName === 'John Doe', upd.body.license.clientName)
     check('key unchanged after update', upd.body.license.licenseKey === lic.licenseKey)
     check('changing duration recomputes the expiry',
       upd.body.license.expiryDate === '2020-02-01T23:59:59.999Z', upd.body.license.expiryDate)

@@ -168,8 +168,11 @@ async function listClients() {
   });
 
   licenses.forEach((license) => {
-    const key = normalizeUsername(license.clientUserId);
-    if (!key) return;
+    // A license links to an account by user ID when it has one. When it only
+    // names a client, that name is the key, so it still shows up here.
+    const key =
+      normalizeUsername(license.clientUserId) || `name:${normalizeUsername(license.clientName)}`;
+    if (key === 'name:') return;
 
     if (!rows.has(key)) {
       rows.set(key, {
@@ -178,7 +181,7 @@ async function listClients() {
         password: '',
         clientName: license.clientName,
         companyName: license.companyName,
-        username: license.clientUserId,
+        username: license.clientUserId || '',
         createdAt: null,
         updatedAt: null,
         products: [],

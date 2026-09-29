@@ -82,8 +82,11 @@ function toPublicLicense(doc, directory) {
   return {
     id: doc.id,
     licenseKey: data.licenseKey,
-    clientName: account?.clientName || data.clientName,
-    companyName: account?.companyName || data.companyName,
+    // The name stored on the license wins: it is what the admin typed on the
+    // form. A linked client account is only the fallback, for licenses issued
+    // before the name was captured directly.
+    clientName: data.clientName || account?.clientName || '',
+    companyName: data.companyName || account?.companyName || '',
     clientUserId,
     productName: data.productName,
     // Who sold this license. Blank on licenses created before it was tracked.
@@ -112,16 +115,12 @@ async function createLicense(payload) {
   const directory = await clientDirectory();
   const account = directory.get(normalizeUserId(payload.clientUserId));
 
-  // The form only asks for the client; their name and company come from the
-  // account. They may still be passed explicitly for a user ID with no account.
+  // The name typed on the form wins. A matching client account only fills in
+  // what was left blank, so a license can name a client who has no account.
   const clientName = payload.clientName || account?.clientName;
-  const companyName = payload.companyName || account?.companyName;
-  if (!clientName || !companyName) {
-    throw new ApiError(
-      400,
-      'Select a client, or add them on the Clients page first',
-      'UNKNOWN_CLIENT'
-    );
+  const companyName = payload.companyName || account?.companyName || '';
+  if (!clientName) {
+    throw new ApiError(400, 'Client name is required', 'CLIENT_NAME_REQUIRED');
   }
 
   const licenseKey = await generateUniqueLicenseKey();
@@ -138,7 +137,7 @@ async function createLicense(payload) {
     licenseKey,
     clientName,
     companyName,
-    clientUserId: payload.clientUserId,
+    clientUserId: payload.clientUserId || '',
     productName: payload.productName,
     soldBy: payload.soldBy,
     duration: period.duration,
@@ -180,6 +179,12 @@ async function updateLicense(id, payload) {
   ['clientName', 'companyName', 'clientUserId', 'productName', 'soldBy'].forEach((field) => {
     if (payload[field] !== undefined) updates[field] = payload[field];
   });
+
+  // The client name identifies the license everywhere it is listed, so an edit
+  // is never allowed to leave it blank.
+  if (updates.clientName !== undefined && !String(updates.clientName).trim()) {
+    delete updates.clientName;
+  }
 
   // Any change to the period is re-resolved as a whole, so a new duration
   // recomputes the expiry from whichever start date now applies.

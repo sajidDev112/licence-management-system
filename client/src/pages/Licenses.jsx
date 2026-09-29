@@ -8,7 +8,7 @@ import Modal from '../components/Modal'
 import LicenseKey from '../components/LicenseKey'
 import { EmptyState, ErrorState, TableSkeleton } from '../components/States'
 import { useToast } from '../components/Toast'
-import useLicenses, { filterLicenses, useClients, useProducts } from '../hooks/useLicenses'
+import useLicenses, { filterLicenses, useProducts } from '../hooks/useLicenses'
 import { licenseApi } from '../services/api'
 import { formatDate } from '../services/format'
 
@@ -27,7 +27,7 @@ const COLUMNS = [
 export default function Licenses() {
   const { licenses, loading, error, reload } = useLicenses()
   const { products } = useProducts()
-  const { clients } = useClients()
+
   const toast = useToast()
 
   const [search, setSearch] = useState('')
@@ -173,7 +173,6 @@ export default function Licenses() {
         open={formOpen}
         license={editing}
         products={products}
-        clients={clients}
         onClose={closeForm}
         onSubmit={handleSubmit}
       />
