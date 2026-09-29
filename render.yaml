@@ -1,0 +1,47 @@
+# Render Blueprint — one Node web service serving the admin dashboard and the
+# license API from the same URL. Deploy: Render dashboard → New → Blueprint.
+# If this folder is not the repository root, set rootDir to its path.
+services:
+  - type: web
+    name: opezee-license-management
+    runtime: node
+    plan: free
+    # rootDir: Licence-management-system
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      # Render sets PORT itself — do not add it here.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TOKEN_EXPIRES_IN
+        value: 12h
+      - key: LICENSE_KEY_PREFIX
+        value: OPEZ
+      # Firebase service account — paste the values from the downloaded JSON.
+      # FIREBASE_PRIVATE_KEY keeps its literal \n escapes.
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      # The dashboard is same-origin, so this is only needed when another site
+      # calls the admin API. The public license endpoints never need it.
+      - key: CORS_ORIGIN
+        sync: false
+      # Email sending. Leave unset to disable it.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false

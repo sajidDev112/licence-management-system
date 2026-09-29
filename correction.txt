@@ -1,0 +1,126 @@
+#. Opezee License Management System
+--------------------------------------
+
+Dashboard (5 min)
+----------
+1. In this page will be show only card visualization of all the licenses.
+2. Remove the the license data table.
+3. Add the setting option in sidebar in bottom.
+4. Add one more option in sidebar Product and client.
+
+License(20 min)
+--------
+1. In this page on table column created date will be change into start date.
+2. In action colunm remove edit option and make symbol for view and delete.
+3. View option will be editable when client data will be open in pop up so that will be editable also.
+4. Email colunm name will be change into user name.
+5. In License pop up Expiry date will be setted as a 1 month, 3 month, 6 month, 1 year.
+6. In License pop up give the custome set of expiry date i mean start date and expiry date.
+7. In License pop up change the Client email to client user Id.
+
+Product (20 min)
+--------
+1. In this page make a table to show the added product.
+2. make a button to add new product and input field will be 2 only product name and product description.
+
+
+Setting (2 hour)
+--------
+1. In this page make a toggle button to change the dark mode and light mode.
+2. In this page give admin change password to access for this web app.
+3. In this page make add email Id and make default email Id.
+
+Login page (1 hour)
+-----------
+1. create a login page for admin. to accesible for License web app.
+2. login creadential will be email and password with dynamic validation.
+
+API for Intract with client to our web app(3 hours)
+-------------------------------------------
+1. create a API foR check the license key.
+2. create a API for Key in Auton sync in 1 hours continuously.
+3. create a API for check login credentials.
+
+
+
+
+
+
+
+# Opezee License Management System
+
+## Correction & Enhancement Tasks
+
+### 1. Dashboard — Estimated Time: 5 Minutes
+
+* Display all license information using **card-based visualization**.
+* Remove the existing **license data table** from the Dashboard.
+* Add a **Settings** option at the bottom of the sidebar.
+* Add two new sidebar options:
+
+  * **Products**
+  * **Clients**
+
+### 2. License Management — Estimated Time: 20 Minutes
+
+* Change the table column **Created Date** to **Start Date**.
+* In the **Action** column:
+
+  * Remove the Edit option.
+  * Add **View** and **Delete** icons.
+* Make the **View** option editable:
+
+  * Open the client's license details in a popup.
+  * Allow the admin to edit and update the client information from the popup.
+* Rename the **Email** column to **User Name**.
+* Update the license popup to provide predefined expiry duration options:
+
+  * 1 Month
+  * 3 Months
+  * 6 Months
+  * 1 Year
+* Add a **Custom Date** option to allow the admin to manually select:
+
+  * Start Date
+  * Expiry Date
+* Rename **Client Email** to **Client User ID** in the license popup.
+
+### 3. Product Management — Estimated Time: 20 Minutes
+
+* Create a **Product Management** page with a table displaying all added products.
+* Add an **Add Product** button.
+* The Add Product form should contain only two fields:
+
+  * Product Name
+  * Product Description
+
+### 4. Settings — Estimated Time: 2 Hours
+
+* Add a **Dark Mode / Light Mode** toggle.
+* Add an option for the admin to **change the login password**.
+* Add functionality to configure email IDs:
+
+  * Add a new email ID.
+  * Set one email ID as the **default email ID**.
+
+### 5. Admin Login Page — Estimated Time: 1 Hour
+
+* Create a dedicated **Admin Login** page to secure access to the License Management System.
+* Login should require:
+
+  * Email
+  * Password
+* Implement **dynamic credential validation** through the backend/API.
+* Allow access to the License Management System only after successful authentication.
+
+### 6. APIs for Client Application Integration — Estimated Time: 3 Hours
+
+* Create an API to **validate/check the license key** from the client application.
+* Create an API for **automatic license-key synchronization**, with synchronization/checking performed continuously at a **1-hour interval**.
+* Create an API to **validate admin login credentials**.
+
+### Estimated Total Effort
+
+**Approximately 6 hours 45 minutes**
+
+These changes cover the required UI corrections, license management improvements, product management, admin settings, authentication, and APIs required for integration with the client application.
