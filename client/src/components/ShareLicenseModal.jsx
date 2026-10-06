@@ -60,8 +60,10 @@ export default function ShareLicenseModal({ open, license, onClose }) {
     setSearch('')
     setNewEmail('')
     setError('')
-    // Start with the default address ticked — the usual case is sending from it.
-    load().then((list) => setSelected(list.filter((e) => e.isDefault).map((e) => e.email)))
+    // Nothing is ticked up front: which address a license goes to is a choice
+    // made per license, not something the Settings default should decide.
+    setSelected([])
+    load()
     licenseApi.mailStatus().then(setCanSend).catch(() => setCanSend(false))
   }, [open, load])
 
@@ -195,15 +197,8 @@ export default function ShareLicenseModal({ open, license, onClose }) {
                   onChange={() => toggle(item.email)}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm text-slate-900 dark:text-white">
-                      {item.email}
-                    </span>
-                    {item.isDefault && (
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
-                        Default
-                      </span>
-                    )}
+                  <span className="truncate text-sm text-slate-900 dark:text-white">
+                    {item.email}
                   </span>
                   {item.label && (
                     <span className="block text-xs text-slate-500 dark:text-slate-400">

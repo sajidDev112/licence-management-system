@@ -81,9 +81,12 @@ export default function Licenses() {
     const next = !toggling.deactivated
     setToggleBusy(true)
     try {
-      await licenseApi.setStatus(toggling.id, next)
-      toast.success(next ? 'License deactivated' : 'License reactivated')
+      const updated = await licenseApi.setStatus(toggling.id, next)
+      toast.success(next ? 'License set to deactive' : 'License reactivated')
       setToggling(null)
+      // The details popup stays open behind the confirmation, so its copy of
+      // the license has to pick up the new status too.
+      setEditing((current) => (current && current.id === updated.id ? updated : current))
       await reload({ silent: true })
     } catch (err) {
       toast.error(err.message)
@@ -136,7 +139,6 @@ export default function Licenses() {
         columns={COLUMNS}
         onCopied={copied}
         actions={{ onView: openView, onDelete: setDeleting }}
-        onToggleStatus={setToggling}
       />
     )
   }
@@ -175,13 +177,14 @@ export default function Licenses() {
         products={products}
         onClose={closeForm}
         onSubmit={handleSubmit}
+        onSetStatus={(license) => setToggling(license)}
       />
 
       <ConfirmDialog
         open={Boolean(toggling)}
         busy={toggleBusy}
-        title={toggling?.deactivated ? 'Reactivate this license?' : 'Deactivate this license?'}
-        confirmLabel={toggling?.deactivated ? 'Reactivate' : 'Deactivate'}
+        title={toggling?.deactivated ? 'Reactivate this license?' : 'Make this license deactive?'}
+        confirmLabel={toggling?.deactivated ? 'Reactivate' : 'Deactive'}
         tone={toggling?.deactivated ? 'primary' : 'danger'}
         message={
           toggling

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 
 import Modal from './Modal'
 import LicenseKey from './LicenseKey'
-import StatusBadge from './StatusBadge'
+import StatusSelect from './StatusSelect'
 import ShareLicenseModal from './ShareLicenseModal'
+import DatePicker from './DatePicker'
 import { DURATIONS, formatDate, previewExpiry, toDateInput } from '../services/format'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -47,6 +48,7 @@ export default function LicenseFormModal({
   products = [],
   onClose,
   onSubmit,
+  onSetStatus,
 }) {
   const isEdit = Boolean(license)
   const [values, setValues] = useState(EMPTY)
@@ -123,20 +125,20 @@ export default function LicenseFormModal({
         isEdit ? (
           <span className="flex items-center gap-2">
             License Details
+            {/* Reads as a button in its own right, not a bare glyph beside the
+                title — sharing is an action, and it was easy to miss before. */}
             <button
               type="button"
               onClick={() => setSharing(true)}
               aria-label="Share this license"
               title="Share this license"
-              className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-indigo-400"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:bg-slate-700 dark:hover:text-indigo-300"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8.684 13.342a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316M18 8a3 3 0 11-.001-5.999A3 3 0 0118 8zm0 13a3 3 0 11-.001-5.999A3 3 0 0118 21z"
-                />
+              {/* A solid curved arrow — the forward/share mark. */}
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M13.4 2.4 L22.2 9.6 L13.4 16.8 V12.7 C8.9 12.7 5.6 14.9 3.6 19.3 L2.4 19 C2.4 11.3 7 6.9 13.4 6.6 Z" />
               </svg>
+              Share
             </button>
           </span>
         ) : (
@@ -160,8 +162,11 @@ export default function LicenseFormModal({
                 The license key cannot be changed.
               </p> */}
             </div>
-            <div className="text-left sm:text-right">
-              <StatusBadge status={license.status} />
+            <div className="flex justify-start sm:justify-end">
+              <StatusSelect
+                status={license.status}
+                onChange={onSetStatus && (() => onSetStatus(license))}
+              />
               {/* <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
                 Created {formatDate(license.createdAt)}
               </p> */}
@@ -235,7 +240,9 @@ export default function LicenseFormModal({
             {fieldError('soldBy')}
           </div>
 
-          <div>
+          {/* Duration spans the row on its own; the two dates then pair up
+              underneath it, which reads in the order they are filled in. */}
+          <div className="sm:col-span-2">
             <label className="label" htmlFor="duration">
               License Duration <span className="text-red-500">*</span>
             </label>
@@ -257,39 +264,28 @@ export default function LicenseFormModal({
             <label className="label" htmlFor="startDate">
               Start Date <span className="text-red-500">*</span>
             </label>
-            <input
+            <DatePicker
               id="startDate"
-              type="date"
-              className={`input ${errors.startDate ? 'border-red-400' : ''}`}
               value={values.startDate}
-              onChange={(e) => setField('startDate', e.target.value)}
+              invalid={Boolean(errors.startDate)}
+              onChange={(v) => setField('startDate', v)}
             />
             {fieldError('startDate')}
           </div>
 
-          <div className="sm:col-span-2">
+          <div>
             <label className="label" htmlFor="expiryDate">
               Expiry Date {isCustom && <span className="text-red-500">*</span>}
             </label>
-            <input
+            <DatePicker
               id="expiryDate"
-              type="date"
-              className={`input ${errors.expiryDate ? 'border-red-400' : ''} ${
-                isCustom ? '' : 'cursor-not-allowed opacity-70'
-              }`}
               value={shownExpiry}
               min={values.startDate || undefined}
-              readOnly={!isCustom}
+              invalid={Boolean(errors.expiryDate)}
               disabled={!isCustom}
-              onChange={(e) => setField('expiryDate', e.target.value)}
+              onChange={(v) => setField('expiryDate', v)}
             />
             {fieldError('expiryDate')}
-            {!isCustom && shownExpiry && (
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Calculated automatically from the start date. Expires {formatDate(shownExpiry)}.
-                Choose <span className="font-medium">Custom Date</span> to set it manually.
-              </p>
-            )}
           </div>
         </div>
 

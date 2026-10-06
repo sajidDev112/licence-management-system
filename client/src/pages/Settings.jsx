@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { ThemePillSwitch } from '../components/ThemeToggle'
 import ConfirmDialog from '../components/ConfirmDialog'
+import Modal from '../components/Modal'
 import IconButton, { ACTION_ICONS } from '../components/IconButton'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../context/AuthContext'
@@ -253,20 +254,128 @@ function ChangePassword() {
   )
 }
 
+const EMPTY_EMAIL = { email: '', label: '', isDefault: false }
+
+/** Add / edit dialog. The same fields serve both, including the default mark. */
+function EmailFormModal({ open, item, onClose, onSubmit }) {
+  const isEdit = Boolean(item)
+  const [values, setValues] = useState(EMPTY_EMAIL)
+  const [errors, setErrors] = useState({})
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setErrors({})
+    setValues(
+      item
+        ? { email: item.email || '', label: item.label || '', isDefault: Boolean(item.isDefault) }
+        : EMPTY_EMAIL
+    )
+  }, [open, item])
+
+  const setField = (name, value) => {
+    setValues((prev) => ({ ...prev, [name]: value }))
+    setErrors((prev) => ({ ...prev, [name]: undefined }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const trimmed = values.email.trim()
+    if (!trimmed) return setErrors({ email: 'Email is required' })
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed))
+      return setErrors({ email: 'Enter a valid email address' })
+
+    setSubmitting(true)
+    try {
+      await onSubmit({ email: trimmed, label: values.label.trim(), isDefault: values.isDefault })
+    } finally {
+      setSubmitting(false)
+    }
+    return undefined
+  }
+
+  return (
+    <Modal
+      open={open}
+      title={isEdit ? 'Edit Email' : 'Add Email'}
+      onClose={submitting ? () => {} : onClose}
+    >
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="space-y-4">
+          <div>
+            <label className="label" htmlFor="emailAddress">
+              Email <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="emailAddress"
+              type="email"
+              autoFocus
+              className={`input ${errors.email ? 'border-red-400' : ''}`}
+              placeholder="notifications@yourcompany.com"
+              value={values.email}
+              onChange={(e) => setField('email', e.target.value)}
+            />
+            {errors.email && (
+              <p className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
+                {errors.email}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="label" htmlFor="emailLabel">
+              Label
+            </label>
+            <input
+              id="emailLabel"
+              className="input"
+              placeholder="Billing, Support, ..."
+              value={values.label}
+              onChange={(e) => setField('label', e.target.value)}
+            />
+          </div>
+
+          {/* Any number of addresses may be default, so this is a plain
+              checkbox rather than a choice between them. */}
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-3 py-2.5 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/60">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800"
+              checked={values.isDefault}
+              onChange={(e) => setField('isDefault', e.target.checked)}
+            />
+            <span>
+              <span className="block text-sm font-medium text-slate-800 dark:text-slate-200">
+                Mark as default
+              </span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">
+                More than one address can be a default.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </button>
+          <button type="submit" className="btn-primary" disabled={submitting}>
+            {submitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Email'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 function EmailConfiguration() {
   const toast = useToast()
   const [emails, setEmails] = useState([])
   const [loading, setLoading] = useState(true)
-  const [value, setValue] = useState('')
-  const [label, setLabel] = useState('')
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
   const [deleting, setDeleting] = useState(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
-  // Editing reuses the add form rather than opening a second one: the fields
-  // are identical, so a separate dialog would only duplicate them.
-  const [editing, setEditing] = useState(null)
-  const formRef = useRef(null)
 
   const load = useCallback(async () => {
     try {
@@ -282,54 +391,32 @@ function EmailConfiguration() {
     load()
   }, [load])
 
-  const resetForm = () => {
+  const openAdd = () => {
     setEditing(null)
-    setValue('')
-    setLabel('')
-    setError('')
+    setFormOpen(true)
   }
 
-  const startEdit = (item) => {
+  const openEdit = (item) => {
     setEditing(item)
-    setValue(item.email)
-    setLabel(item.label || '')
-    setError('')
-    // The form sits above the list, so bring it into view and focus it.
-    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    formRef.current?.querySelector('input')?.focus()
+    setFormOpen(true)
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!value.trim()) return setError('Email is required')
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()))
-      return setError('Enter a valid email address')
-
-    setError('')
-    setSubmitting(true)
+  const handleSubmit = async (payload) => {
     try {
-      const payload = { email: value.trim(), label: label.trim() }
       if (editing) {
         await emailApi.update(editing.id, payload)
         toast.success('Email updated successfully')
       } else {
-        await emailApi.add(payload)
+        const created = await emailApi.add({ email: payload.email, label: payload.label })
+        // Adding does not take the flag, so it is applied straight after when
+        // the box was ticked. The very first address is already a default.
+        if (payload.isDefault && !created.isDefault) {
+          await emailApi.setDefault(created.id, true)
+        }
         toast.success('Email added successfully')
       }
-      resetForm()
-      await load()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setSubmitting(false)
-    }
-    return undefined
-  }
-
-  const handleSetDefault = async (id) => {
-    try {
-      await emailApi.setDefault(id)
-      toast.success('Default email updated')
+      setFormOpen(false)
+      setEditing(null)
       await load()
     } catch (err) {
       toast.error(err.message)
@@ -344,7 +431,7 @@ function EmailConfiguration() {
       setDeleting(null)
       await load()
     } catch (err) {
-      // The backend refuses to remove the default while others still exist.
+      // The backend refuses to remove the last default while others remain.
       toast.error(err.message)
       setDeleting(null)
     } finally {
@@ -354,54 +441,11 @@ function EmailConfiguration() {
 
   return (
     <>
-      {/* {editing && (
-        <p className="mb-2 text-xs font-medium text-indigo-600 dark:text-indigo-400">
-          Editing {editing.email}
-        </p>
-      )} */}
-
-      <form
-        ref={formRef}
-        onSubmit={handleSubmit}
-        noValidate
-        className="mb-5 flex flex-col gap-3 sm:flex-row"
-      >
-        <div className="flex-1">
-          <input
-            type="email"
-            className={`input ${error ? 'border-red-400' : ''}`}
-            placeholder="notifications@yourcompany.com"
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value)
-              setError('')
-            }}
-          />
-          {error && (
-            <p className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">{error}</p>
-          )}
-        </div>
-        <input
-          className="input sm:max-w-[10rem]"
-          placeholder="Label (optional)"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-        />
-        <button type="submit" className="btn-primary shrink-0" disabled={submitting}>
-          {submitting ? (editing ? 'Saving...' : 'Adding...') : editing ? 'Save Changes' : 'Add Email'}
+      <div className="mb-4 flex justify-end">
+        <button type="button" className="btn-primary" onClick={openAdd}>
+          + Add Email
         </button>
-
-        {editing && (
-          <button
-            type="button"
-            onClick={resetForm}
-            disabled={submitting}
-            className="shrink-0 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            Cancel
-          </button>
-        )}
-      </form>
+      </div>
 
       {loading ? (
         <div className="space-y-2">
@@ -411,57 +455,75 @@ function EmailConfiguration() {
         </div>
       ) : emails.length === 0 ? (
         <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-          No email IDs configured yet. The first one you add becomes the default.
+          No email IDs configured yet. The first one you add becomes a default.
         </p>
       ) : (
-        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-          {emails.map((item) => (
-            <li
-              key={item.id}
-              className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate text-sm font-medium text-slate-900 dark:text-white">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+          <table className="w-full table-auto text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
+              <tr>
+                <th className="table-head">Email</th>
+                <th className="table-head">Label</th>
+                <th className="table-head">Status</th>
+                <th className="table-head">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {emails.map((item) => (
+                <tr
+                  key={item.id}
+                  className="transition hover:bg-slate-50/70 dark:hover:bg-slate-800/40"
+                >
+                  <td className="px-2 py-3 font-medium text-slate-900 dark:text-white">
                     {item.email}
-                  </span>
-                  {item.isDefault && (
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
-                      Default
-                    </span>
-                  )}
-                </div>
-                {item.label && (
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{item.label}</p>
-                )}
-              </div>
-
-              <div className="flex shrink-0 items-center gap-1">
-                {!item.isDefault && (
-                  <button
-                    type="button"
-                    onClick={() => handleSetDefault(item.id)}
-                    className="rounded-md px-2 py-1 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-500/10"
-                  >
-                    Set as default
-                  </button>
-                )}
-                <IconButton
-                  label="Edit"
-                  paths={ACTION_ICONS.edit}
-                  onClick={() => startEdit(item)}
-                />
-                <IconButton
-                  label="Delete"
-                  paths={ACTION_ICONS.delete}
-                  tone="danger"
-                  onClick={() => setDeleting(item)}
-                />
-              </div>
-            </li>
-          ))}
-        </ul>
+                  </td>
+                  <td className="px-2 py-3 text-slate-600 dark:text-slate-300">
+                    {item.label || (
+                      <span className="text-slate-400 dark:text-slate-600">&mdash;</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-3">
+                    {item.isDefault ? (
+                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+                        Default
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                        Not default
+                      </span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-3">
+                    <div className="flex items-center gap-1">
+                      <IconButton
+                        label="Edit"
+                        paths={ACTION_ICONS.edit}
+                        onClick={() => openEdit(item)}
+                      />
+                      <IconButton
+                        label="Delete"
+                        paths={ACTION_ICONS.delete}
+                        tone="danger"
+                        onClick={() => setDeleting(item)}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+
+      <EmailFormModal
+        open={formOpen}
+        item={editing}
+        onClose={() => {
+          setFormOpen(false)
+          setEditing(null)
+        }}
+        onSubmit={handleSubmit}
+      />
 
       <ConfirmDialog
         open={Boolean(deleting)}
@@ -471,7 +533,7 @@ function EmailConfiguration() {
         message={
           deleting
             ? `${deleting.email} will be removed from your configured email IDs.${
-                deleting.isDefault ? ' It is currently the default address.' : ''
+                deleting.isDefault ? ' It is currently marked as a default.' : ''
               }`
             : ''
         }

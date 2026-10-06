@@ -36,8 +36,10 @@ const updateEmail = asyncHandler(async (req, res) => {
 });
 
 const setDefaultEmail = asyncHandler(async (req, res) => {
-  const email = await adminService.setDefaultEmail(req.params.id);
-  res.json({ success: true, message: 'Default email updated', email });
+  // Absent means "mark it", so the old call with no body still works.
+  const wanted = req.body?.isDefault === undefined ? true : Boolean(req.body.isDefault);
+  const email = await adminService.setDefaultEmail(req.params.id, wanted);
+  res.json({ success: true, message: 'Default emails updated', email });
 });
 
 const deleteEmail = asyncHandler(async (req, res) => {

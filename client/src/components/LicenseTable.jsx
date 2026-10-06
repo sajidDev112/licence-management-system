@@ -31,7 +31,9 @@ const COLUMNS = {
   status: {
     header: 'Status',
     nowrap: true,
-    render: (l, ctx) => <StatusBadge status={l.status} onToggle={ctx.onToggleStatus && (() => ctx.onToggleStatus(l))} />,
+    // Display only. The license is switched off and on from its details popup,
+    // so a stray click in a long table cannot cut a client off.
+    render: (l) => <StatusBadge status={l.status} />,
   },
 }
 
@@ -52,7 +54,7 @@ function Actions({ license, actions }) {
   )
 }
 
-export default function LicenseTable({ licenses, columns, actions, onCopied, onToggleStatus }) {
+export default function LicenseTable({ licenses, columns, actions, onCopied }) {
   const cols = columns.map((key) => ({ key, ...COLUMNS[key] }))
 
   return (
@@ -85,7 +87,7 @@ export default function LicenseTable({ licenses, columns, actions, onCopied, onT
                       c.nowrap ? 'whitespace-nowrap' : 'break-words'
                     }`}
                   >
-                    {c.render(license, { onCopied, onToggleStatus })}
+                    {c.render(license, { onCopied })}
                   </td>
                 ))}
                 <td className="whitespace-nowrap px-2 py-3 align-middle">
@@ -111,10 +113,7 @@ export default function LicenseTable({ licenses, columns, actions, onCopied, onT
                   {license.companyName}
                 </p>
               </div>
-              <StatusBadge
-                status={license.status}
-                onToggle={onToggleStatus && (() => onToggleStatus(license))}
-              />
+              <StatusBadge status={license.status} />
             </div>
             <LicenseKey value={license.licenseKey} onCopied={onCopied} />
             <dl className="grid grid-cols-2 gap-y-2 text-sm">

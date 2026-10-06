@@ -231,6 +231,42 @@ async function setLicenseDeactivated(id, deactivated) {
   return toPublicLicense(await ref.get(), await clientDirectory());
 }
 
+/**
+ * Points licenses that only name a client at a newly created account.
+ *
+ * A license created from the Licenses page carries a client name but no user
+ * ID. When credentials are later added for that name, those licenses have to
+ * adopt the new username — otherwise the Clients page keeps showing two rows
+ * for the same person and the product login finds no licenses for them.
+ *
+ * Only licenses with no user ID at all are touched; one already linked to
+ * someone keeps its link.
+ */
+async function adoptUnlinkedLicenses(clientName, username, companyName) {
+  const name = normalizeUserId(clientName);
+  const user = normalizeUserId(username);
+  const company = normalizeUserId(companyName);
+  if (!name || !user) return 0;
+
+  const snap = await collection().get();
+  const orphans = snap.docs.filter((doc) => {
+    const data = doc.data();
+    if (normalizeUserId(data.clientUserId)) return false;
+    if (normalizeUserId(data.clientName) !== name) return false;
+
+    // Client names may repeat across companies, so a license that names a
+    // company only joins an account with the same one. A license with no
+    // company recorded — the usual case from the Licenses form — goes by name.
+    const licenseCompany = normalizeUserId(data.companyName);
+    return !licenseCompany || !company || licenseCompany === company;
+  });
+
+  await Promise.all(
+    orphans.map((doc) => doc.ref.update({ clientUserId: user, updatedAt: Timestamp.now() }))
+  );
+  return orphans.length;
+}
+
 async function deleteLicense(id) {
   const ref = collection().doc(id);
   const doc = await ref.get();
@@ -338,6 +374,7 @@ module.exports = {
   updateLicense,
   setLicenseDeactivated,
   deleteLicense,
+  adoptUnlinkedLicenses,
   checkLicense,
   getStats,
   listClients,

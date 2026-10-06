@@ -44,7 +44,7 @@ export default function Dashboard() {
             loading={loading}
           />
           <StatCard
-            label="Deactivated"
+            label="Deactive"
             value={stats.deactivatedLicenses}
             tone="slate"
             icon={STAT_ICONS.deactivated}

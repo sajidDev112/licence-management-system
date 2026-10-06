@@ -1,0 +1,30 @@
+# Light a Lamp Feedback
+
+--> change the App icon like previous app.
+
+--> After open app the second pange there text should be "Choose The Screen this Display".
+    and "Last used on this display". 
+    same page in bottom map logo and opezee is hidden please fix it.
+
+--> In dashboard page bottom left side should be "Powered by Opezee" and right side should be "Logout" button".
+
+--> In kiosk Screen after scan the QR code the user name should be come first letter Capital.
+
+--> QR Code now is white it should be yellowest color.
+
+--> In QR COde scanner in bottom add text "Scan to Diya".  --- doubt.
+
+# Mobile Screen web App.
+
+--> In bottom powered by opezee is hidden now fix it.
+
+--> Now screen is scrollable it should not be scrollable fix it.
+
+--> In form page there remove the check boxes.
+
+--> In form page remove the red text validation it should be border red and lable will be in star.
+
+--> In choose diya page what ever diya will choose that diya should be light up and it is not mobile responsive also pleas fix it.
+
+--> after diya light up Download is not working it should be download same page in user mobile.
+    and remove the text "Long press the  image".

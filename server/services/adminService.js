@@ -166,16 +166,6 @@ async function listEmails() {
   return snap.docs.map(toPublicEmail);
 }
 
-/** Clears the default flag everywhere except `keepId`. */
-async function clearOtherDefaults(keepId) {
-  const snap = await emails().where('isDefault', '==', true).get();
-  await Promise.all(
-    snap.docs
-      .filter((doc) => doc.id !== keepId)
-      .map((doc) => doc.ref.update({ isDefault: false }))
-  );
-}
-
 async function addEmail({ email, label }) {
   const normalized = String(email).trim().toLowerCase();
 
@@ -200,10 +190,10 @@ async function addEmail({ email, label }) {
 }
 
 /**
- * Edits an existing address. The default flag is left alone: changing which
- * address is the default is a separate, explicit action.
+ * Edits an existing address, including whether it is a default. Any number of
+ * addresses may be default at once — marking one never unmarks another.
  */
-async function updateEmail(id, { email, label }) {
+async function updateEmail(id, { email, label, isDefault }) {
   const ref = emails().doc(id);
   const doc = await ref.get();
   if (!doc.exists) throw new ApiError(404, 'Email configuration not found', 'EMAIL_NOT_FOUND');
@@ -221,18 +211,19 @@ async function updateEmail(id, { email, label }) {
 
   // An empty label is a real value here — it clears the label.
   if (label !== undefined) updates.label = label || '';
+  if (isDefault !== undefined) updates.isDefault = Boolean(isDefault);
 
   if (Object.keys(updates).length) await ref.update(updates);
   return toPublicEmail(await ref.get());
 }
 
-async function setDefaultEmail(id) {
+/** Marks an address as a default, or clears that mark. Others are untouched. */
+async function setDefaultEmail(id, isDefault = true) {
   const ref = emails().doc(id);
   const doc = await ref.get();
   if (!doc.exists) throw new ApiError(404, 'Email configuration not found', 'EMAIL_NOT_FOUND');
 
-  await ref.update({ isDefault: true });
-  await clearOtherDefaults(id);
+  await ref.update({ isDefault: Boolean(isDefault) });
   return toPublicEmail(await ref.get());
 }
 
@@ -241,13 +232,15 @@ async function deleteEmail(id) {
   const doc = await ref.get();
   if (!doc.exists) throw new ApiError(404, 'Email configuration not found', 'EMAIL_NOT_FOUND');
 
+  // Deleting a default is fine while another default remains; the list should
+  // never be left with addresses but no default at all.
   const all = await emails().get();
-  const wasDefault = Boolean(doc.data().isDefault);
+  const otherDefaults = all.docs.filter((d) => d.id !== id && Boolean(d.data().isDefault));
 
-  if (wasDefault && all.size > 1) {
+  if (Boolean(doc.data().isDefault) && all.size > 1 && otherDefaults.length === 0) {
     throw new ApiError(
       400,
-      'Set another email as default before deleting this one',
+      'Mark another email as default before deleting this one',
       'CANNOT_DELETE_DEFAULT'
     );
   }

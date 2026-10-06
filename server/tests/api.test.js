@@ -505,13 +505,33 @@ const server = app.listen(0, async () => {
     check('refuses to delete the default while others exist',
       (await call('DELETE', `/api/admin/emails/${e1.body.email.id}`)).status === 400)
 
+    // Several addresses may be default at once; marking one never unmarks another.
     await call('PUT', `/api/admin/emails/${e2.body.email.id}/default`)
-    const emailList = await call('GET', '/api/admin/emails')
-    const defaults = emailList.body.emails.filter((e) => e.isDefault)
-    check('exactly one email is default after switching', defaults.length === 1, emailList.body.emails)
-    check('the newly chosen email is the default', defaults[0].email === 'second@test.com')
-    check('the previous default can now be deleted',
+    let emailList = await call('GET', '/api/admin/emails')
+    let defaults = emailList.body.emails.filter((e) => e.isDefault)
+    check('both emails can be default at once', defaults.length === 2, emailList.body.emails)
+
+    check('a default can be deleted while another default remains',
       (await call('DELETE', `/api/admin/emails/${e1.body.email.id}`)).status === 200)
+
+    // The edit form sets the flag too, and clearing the last one is refused.
+    const e3 = await call('POST', '/api/admin/emails', { email: 'third@test.com' })
+    check('a later email is not default', e3.body.email.isDefault === false)
+    const marked = await call('PUT', `/api/admin/emails/${e3.body.email.id}`,
+      { email: 'third@test.com', label: 'Ops', isDefault: true })
+    check('editing an email can mark it default', marked.body.email.isDefault === true, marked.body)
+
+    const unmarked = await call('PUT', `/api/admin/emails/${e3.body.email.id}/default`, { isDefault: false })
+    check('a default mark can be cleared again', unmarked.body.email.isDefault === false, unmarked.body)
+
+    emailList = await call('GET', '/api/admin/emails')
+    defaults = emailList.body.emails.filter((e) => e.isDefault)
+    check('only the remaining default is marked', defaults.length === 1 &&
+      defaults[0].email === 'second@test.com', emailList.body.emails)
+    check('refuses to delete the last default while others exist',
+      (await call('DELETE', `/api/admin/emails/${defaults[0].id}`)).status === 400)
+    check('a non-default email deletes freely',
+      (await call('DELETE', `/api/admin/emails/${e3.body.email.id}`)).status === 200)
 
     console.log('\n-- branding --')
     const b0 = await call('GET', '/api/admin/branding', null, { auth: false })

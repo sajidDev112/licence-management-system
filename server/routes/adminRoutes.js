@@ -99,6 +99,7 @@ router.put(
       .withMessage('Enter a valid email address')
       .normalizeEmail(),
     body('label').optional({ values: 'falsy' }).trim().escape().isLength({ max: 60 }),
+    body('isDefault').optional().isBoolean().withMessage('Default must be true or false'),
   ],
   validate,
   controller.updateEmail
@@ -106,7 +107,10 @@ router.put(
 
 router.put(
   '/emails/:id/default',
-  [param('id').trim().notEmpty()],
+  [
+    param('id').trim().notEmpty(),
+    body('isDefault').optional().isBoolean().withMessage('Default must be true or false'),
+  ],
   validate,
   controller.setDefaultEmail
 );

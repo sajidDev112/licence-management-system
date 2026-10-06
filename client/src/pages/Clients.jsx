@@ -368,12 +368,12 @@ export default function Clients() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="page-title">Clients</h1>
-        <button className="btn-primary" onClick={openCreate}>
+        {/* <button className="btn-primary" onClick={openCreate}>
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
           Add Client
-        </button>
+        </button> */}
       </div>
 
       <div className="card overflow-hidden">

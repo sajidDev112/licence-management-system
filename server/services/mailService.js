@@ -68,7 +68,15 @@ const STATUS_COLORS = {
   active: '#059669',
   pending: '#d97706',
   expired: '#dc2626',
-  deactivated: '#64748b',
+  // Red, like the console: a switched-off license blocks a client just as
+  // firmly as an expired one.
+  deactivated: '#dc2626',
+};
+
+// How each status is written for the recipient. Only the ones that differ from
+// a plain capitalisation of the stored value need an entry.
+const STATUS_LABELS = {
+  deactivated: 'Deactive',
 };
 
 function buildRows(license) {
@@ -99,7 +107,7 @@ function buildHtml(license, logo) {
       const display = isStatus
         ? `<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;text-transform:capitalize;color:#ffffff;background:${
             STATUS_COLORS[value] || STATUS_COLORS.expired
-          };">${escapeHtml(value)}</span>`
+          };">${escapeHtml(STATUS_LABELS[value] || value)}</span>`
         : escapeHtml(value);
 
       return `

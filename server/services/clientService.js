@@ -56,6 +56,26 @@ async function assertUsernameAvailable(username, exceptId) {
   }
 }
 
+/**
+ * Company names identify the organisation behind an account, so no two
+ * accounts may share one. Client names are deliberately *not* unique: several
+ * people at different companies can have the same name.
+ */
+async function assertCompanyAvailable(companyName, exceptId) {
+  const normalized = normalizeUsername(companyName);
+  if (!normalized) return;
+
+  // Compared in code rather than with a where(): the stored value keeps its
+  // original casing, so an equality query would miss "ABC Pvt Ltd" vs "abc pvt ltd".
+  const snap = await collection().get();
+  const clash = snap.docs.find(
+    (doc) => doc.id !== exceptId && normalizeUsername(doc.data().companyName) === normalized
+  );
+  if (clash) {
+    throw new ApiError(409, 'That company name is already taken', 'COMPANY_TAKEN');
+  }
+}
+
 function assertPasswordStrength(password) {
   if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
     throw new ApiError(
@@ -69,6 +89,7 @@ function assertPasswordStrength(password) {
 async function createClient({ clientName, companyName, username, password }) {
   const normalized = normalizeUsername(username);
   await assertUsernameAvailable(normalized);
+  await assertCompanyAvailable(companyName);
   assertPasswordStrength(password);
 
   const ref = await collection().add({
@@ -80,6 +101,11 @@ async function createClient({ clientName, companyName, username, password }) {
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   });
+
+  // Licenses issued to this name before the account existed now belong to it,
+  // so the Clients page shows one row rather than two and the product login
+  // finds them.
+  await licenseService.adoptUnlinkedLicenses(clientName, normalized, companyName);
 
   return toPublicClient(await ref.get(), { includePassword: true });
 }
@@ -97,7 +123,11 @@ async function updateClient(id, { clientName, companyName, username, password })
 
   const updates = { updatedAt: Timestamp.now() };
   if (clientName !== undefined) updates.clientName = clientName;
-  if (companyName !== undefined) updates.companyName = companyName;
+
+  if (companyName !== undefined) {
+    await assertCompanyAvailable(companyName, id);
+    updates.companyName = companyName;
+  }
 
   if (username !== undefined) {
     const normalized = normalizeUsername(username);

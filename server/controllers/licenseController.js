@@ -61,7 +61,7 @@ const share = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    message: `License sent to ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}`,
+    message: 'License details sent to the recipient',
     sentTo: result.accepted,
   });
 });

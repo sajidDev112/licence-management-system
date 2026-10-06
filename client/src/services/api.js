@@ -116,7 +116,8 @@ export const emailApi = {
   list: () => client.get('/admin/emails').then((r) => r.data.emails),
   add: (payload) => client.post('/admin/emails', payload).then((r) => r.data.email),
   update: (id, payload) => client.put(`/admin/emails/${id}`, payload).then((r) => r.data.email),
-  setDefault: (id) => client.put(`/admin/emails/${id}/default`).then((r) => r.data.email),
+  setDefault: (id, isDefault = true) =>
+    client.put(`/admin/emails/${id}/default`, { isDefault }).then((r) => r.data.email),
   remove: (id) => client.delete(`/admin/emails/${id}`).then((r) => r.data),
 }
 
