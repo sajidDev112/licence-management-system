@@ -586,6 +586,25 @@ const server = app.listen(0, async () => {
       (await call('POST', '/api/clients/login',
         { username: 'john.doe', password: 'ClientPass123' }, { auth: false })).status === 200)
 
+    // Editing a client must change the existing row, not appear to add one.
+    // Licenses are matched on the user id, so a changed email has to be
+    // carried through to them or the client shows up twice.
+    const rowsBefore = (await call('GET', '/api/clients')).body.clients.length
+    await call('PUT', `/api/clients/${clientId}`, { username: 'jonathan.doe' })
+    const afterEmail = (await call('GET', '/api/clients')).body.clients
+    check('changing the email does not split the client in two',
+      afterEmail.length === rowsBefore, afterEmail.map((c) => c.username))
+
+    const moved = afterEmail.find((c) => c.username === 'jonathan.doe')
+    check('the licenses move with them', moved && moved.totalLicenses === 5, moved)
+    check('no login-less leftover is left behind',
+      !afterEmail.some((c) => c.username === 'john.doe'))
+    check('the client signs in with the new email',
+      (await call('POST', '/api/clients/login',
+        { username: 'jonathan.doe', password: 'ClientPass123' }, { auth: false })).status === 200)
+
+    await call('PUT', `/api/clients/${clientId}`, { username: 'john.doe' })
+
     await call('PUT', `/api/clients/${clientId}`, { password: 'BrandNewPass9' })
     check('changing the password invalidates the old one',
       (await call('POST', '/api/clients/login',
@@ -596,6 +615,51 @@ const server = app.listen(0, async () => {
 
     check('cannot delete a client that still holds licenses',
       (await call('DELETE', `/api/clients/${clientId}`)).status === 409)
+
+    // The POC name identifies the person, so it is unique across accounts —
+    // which is what makes several licenses naming it belong to one client
+    // rather than to look-alike duplicates.
+    const poc1 = await call('POST', '/api/clients', {
+      clientName: 'Unique Poc', companyName: 'Poc Co One',
+      username: 'poc.one@test.com', password: 'PocPass12345',
+    })
+    check('a client can be created with a fresh POC name', poc1.status === 201, poc1.body)
+
+    const poc2 = await call('POST', '/api/clients', {
+      clientName: 'unique poc', companyName: 'Poc Co Two',
+      username: 'poc.two@test.com', password: 'PocPass12345',
+    })
+    check('a duplicate POC name is refused, ignoring case', poc2.status === 409, poc2.body)
+    check('and says which field clashed', poc2.body.code === 'POC_TAKEN')
+
+    check('renaming onto an existing POC name is refused too',
+      (await call('PUT', `/api/clients/${poc1.body.client.id}`,
+        { clientName: 'Jonathan Doe' })).status === 409)
+    check('a client keeps its own POC name on edit',
+      (await call('PUT', `/api/clients/${poc1.body.client.id}`,
+        { clientName: 'Unique Poc', companyName: 'Poc Co One Renamed' })).status === 200)
+
+    // Several licenses for that one POC all land on the same client.
+    const lic1 = await call('POST', '/api/licenses', newLicense({
+      clientName: 'Unique Poc', clientUserId: 'poc.one@test.com',
+      duration: 'custom', startDate: '2020-01-01', expiryDate: '2099-01-01',
+    }))
+    const lic2 = await call('POST', '/api/licenses', newLicense({
+      clientName: 'Unique Poc', clientUserId: 'poc.one@test.com', productName: 'Second Product',
+      duration: 'custom', startDate: '2020-01-01', expiryDate: '2099-01-01',
+    }))
+    check('two licenses can be issued to one POC',
+      lic1.status === 201 && lic2.status === 201 &&
+        lic1.body.license.licenseKey !== lic2.body.license.licenseKey, lic2.body)
+
+    const pocRows = (await call('GET', '/api/clients')).body.clients
+      .filter((c) => (c.clientName || '').toLowerCase() === 'unique poc')
+    check('they gather on a single client row',
+      pocRows.length === 1 && pocRows[0].totalLicenses === 2, pocRows)
+
+    await call('DELETE', `/api/licenses/${lic1.body.license.id}`)
+    await call('DELETE', `/api/licenses/${lic2.body.license.id}`)
+    await call('DELETE', `/api/clients/${poc1.body.client.id}`)
 
     const spare = await call('POST', '/api/clients', {
       clientName: 'Temp', companyName: 'Temp Co', username: 'temp.user', password: 'TempPass123',
@@ -608,10 +672,10 @@ const server = app.listen(0, async () => {
     console.log('\n-- update + delete --')
     const upd = await call('PUT', `/api/licenses/${lic.id}`, { soldBy: 'Dana Seller', duration: '1_month' })
     check('updates fields', upd.body.license.soldBy === 'Dana Seller', upd.body)
-    // john.doe has a client account with a different name on it by this point;
-    // the name stored on the license is still the one that shows.
-    check('the license keeps its own client name',
-      upd.body.license.clientName === 'John Doe', upd.body.license.clientName)
+    // The client account was renamed to 'Jonathan Doe' earlier, and that edit
+    // is carried through to their licenses so the two pages agree.
+    check('renaming a client reaches their licenses',
+      upd.body.license.clientName === 'Jonathan Doe', upd.body.license.clientName)
     check('key unchanged after update', upd.body.license.licenseKey === lic.licenseKey)
     check('changing duration recomputes the expiry',
       upd.body.license.expiryDate === '2020-02-01T23:59:59.999Z', upd.body.license.expiryDate)

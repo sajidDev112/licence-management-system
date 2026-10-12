@@ -57,10 +57,28 @@ async function assertUsernameAvailable(username, exceptId) {
 }
 
 /**
- * Company names identify the organisation behind an account, so no two
- * accounts may share one. Client names are deliberately *not* unique: several
- * people at different companies can have the same name.
+ * The POC name identifies the person a license is issued to, so no two client
+ * accounts may share one. One POC can hold any number of licenses — that is
+ * the point of the name being unique: every license naming it belongs to the
+ * same person rather than to a second account that happens to be called the
+ * same thing.
  */
+async function assertPocAvailable(clientName, exceptId) {
+  const normalized = normalizeUsername(clientName);
+  if (!normalized) return;
+
+  // Compared in code rather than with a where(): the stored value keeps its
+  // original casing, so an equality query would miss "Sajid" vs "sajid".
+  const snap = await collection().get();
+  const clash = snap.docs.find(
+    (doc) => doc.id !== exceptId && normalizeUsername(doc.data().clientName) === normalized
+  );
+  if (clash) {
+    throw new ApiError(409, 'That POC name is already taken', 'POC_TAKEN');
+  }
+}
+
+/** Company names identify the organisation, so no two accounts may share one. */
 async function assertCompanyAvailable(companyName, exceptId) {
   const normalized = normalizeUsername(companyName);
   if (!normalized) return;
@@ -89,6 +107,7 @@ function assertPasswordStrength(password) {
 async function createClient({ clientName, companyName, username, password }) {
   const normalized = normalizeUsername(username);
   await assertUsernameAvailable(normalized);
+  await assertPocAvailable(clientName);
   await assertCompanyAvailable(companyName);
   assertPasswordStrength(password);
 
@@ -121,8 +140,16 @@ async function updateClient(id, { clientName, companyName, username, password })
   const doc = await ref.get();
   if (!doc.exists) throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
 
+  // Read before writing: this is what the licenses are currently matched on,
+  // and it is needed again after the account has already been changed.
+  const previousUsername = doc.data().username;
+
   const updates = { updatedAt: Timestamp.now() };
-  if (clientName !== undefined) updates.clientName = clientName;
+
+  if (clientName !== undefined) {
+    await assertPocAvailable(clientName, id);
+    updates.clientName = clientName;
+  }
 
   if (companyName !== undefined) {
     await assertCompanyAvailable(companyName, id);
@@ -143,6 +170,17 @@ async function updateClient(id, { clientName, companyName, username, password })
   }
 
   await ref.update(updates);
+
+  // Their licenses have to follow the edit. A changed email in particular is
+  // what licenses are matched on, so leaving them behind splits the Clients
+  // page into two rows for the same person — which reads as a duplicate having
+  // been created rather than the existing one edited.
+  await licenseService.relinkClientLicenses(previousUsername, {
+    ...(updates.username !== undefined ? { username: updates.username } : {}),
+    ...(updates.clientName !== undefined ? { clientName: updates.clientName } : {}),
+    ...(updates.companyName !== undefined ? { companyName: updates.companyName } : {}),
+  });
+
   return toPublicClient(await ref.get(), { includePassword: true });
 }
 

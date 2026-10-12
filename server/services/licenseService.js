@@ -414,6 +414,31 @@ async function updateLicenseContact({ licenseKey, machineNumber, productName, cl
   return toPublicLicense(await ref.get(), await clientDirectory());
 }
 
+/**
+ * Carries an edited client account through to their licenses.
+ *
+ * Licenses are matched to a client by user id, and the Licenses table shows the
+ * name stored on the license. So renaming a client — or changing the email they
+ * sign in with — has to reach their licenses too, or the Clients page splits
+ * into two rows for the same person and the two pages disagree.
+ */
+async function relinkClientLicenses(previousUsername, { username, clientName, companyName }) {
+  const previous = normalizeUserId(previousUsername);
+  if (!previous) return 0;
+
+  const snap = await collection().get();
+  const mine = snap.docs.filter((doc) => normalizeUserId(doc.data().clientUserId) === previous);
+  if (!mine.length) return 0;
+
+  const updates = { updatedAt: Timestamp.now() };
+  if (username !== undefined) updates.clientUserId = normalizeUserId(username);
+  if (clientName !== undefined) updates.clientName = String(clientName).trim();
+  if (companyName !== undefined) updates.companyName = String(companyName).trim();
+
+  await Promise.all(mine.map((doc) => doc.ref.update(updates)));
+  return mine.length;
+}
+
 async function getStats() {
   const licenses = await listLicenses();
   const active = licenses.filter((l) => l.status === 'active').length;
@@ -486,6 +511,7 @@ module.exports = {
   setLicenseDeactivated,
   deleteLicense,
   adoptUnlinkedLicenses,
+  relinkClientLicenses,
   checkLicense,
   updateLicenseContact,
   getStats,
