@@ -39,6 +39,7 @@ Your product never touches Firebase, and never needs an admin token. It only cal
   - [1. Check a key is valid](#1-check-a-key-is-valid)
   - [2. Re-check hourly (auto-sync)](#2-re-check-hourly-auto-sync)
   - [3. Check login credentials](#3-check-login-credentials)
+- [One machine per license](#one-machine-per-license)
 - [Security](#security)
 - [Deploying to Render](#deploying-to-render)
 - [Tests](#tests)
@@ -732,6 +733,41 @@ use `/api/licenses/sync` hourly to notice changes.
 
 ---
 
+### One machine per license
+
+A license is locked to a single machine, so one key cannot be installed across
+several systems.
+
+Send a `machineNumber` with every `/verify` and `/sync` call — any string your
+product can derive **stably** for the machine it runs on, the same value on every
+launch. A hardware or install id works; anything that changes on reinstall or
+between sessions does not.
+
+```
+first verify with a machine number  ->  that machine claims the key
+same machine verifies again         ->  valid
+a different machine verifies        ->  403, "already in use on another machine"
+no machine number on a claimed key  ->  403
+```
+
+The claim happens **only when the license is otherwise usable**. An expired,
+deactivated or not-yet-started key is never claimed, so a machine cannot lock
+itself to a license it could not have run anyway.
+
+Comparison ignores case and surrounding whitespace. The dashboard shows the
+claimed machine in the **Machine No.** column and in the license's details
+popup, where it is read-only.
+
+A license created before this existed has no machine recorded. The next machine
+to verify it claims it, so nothing breaks — but until then that key still works
+from anywhere.
+
+> **Moving a client to a new machine.** There is no release action yet: once a
+> key is claimed, that claim stands. To move a client, delete the license and
+> issue a new key, or clear `machineNumber` on the document in Firestore.
+
+---
+
 ### Verification endpoint (public)
 
 ```http
@@ -747,18 +783,25 @@ Request:
 ```json
 {
   "licenseKey": "OPEZ-8F4K-92LM-X7PQ",
-  "productName": "My Product"
+  "productName": "My Product",
+  "machineNumber": "PC-ALPHA-01"
 }
 ```
 
 `productName` is optional. When present, the license must have been issued for
 that exact product (compared case-insensitively).
 
+`machineNumber` identifies the machine your product is installed on — see
+[One machine per license](#one-machine-per-license). `machine_number` is
+accepted as a spelling of the same field. Up to 128 characters of
+`A-Z a-z 0-9 . _ : -`.
+
 Keys are normalized before lookup, so `opez 8f4k 92lm x7pq` and
 `OPEZ-8F4K-92LM-X7PQ` both work.
 
 The backend checks, in order: the key exists, it belongs to the requested
-product, the start date has been reached, and the expiry date has not passed.
+product, the start date has been reached, the expiry date has not passed, and
+the machine matches the one that claimed the key.
 
 #### Valid license — `200 OK`
 
@@ -772,6 +815,7 @@ product, the start date has been reached, and the expiry date has not passed.
     "clientName": "John Doe",
     "companyName": "ABC Pvt Ltd",
     "productName": "My Product",
+    "machineNumber": "PC-ALPHA-01",
     "startDate": "2026-09-23T00:00:00.000Z",
     "expiryDate": "2027-09-23T23:59:59.999Z",
     "status": "active"
@@ -788,6 +832,19 @@ product, the start date has been reached, and the expiry date has not passed.
   "message": "Invalid license key"
 }
 ```
+
+#### Key already claimed by another machine — `403 Forbidden`
+
+```json
+{
+  "success": false,
+  "valid": false,
+  "message": "License is already in use on another machine"
+}
+```
+
+The machine that holds the key is deliberately **not** named in the response:
+echoing it back would hand out the one value needed to impersonate it.
 
 #### Expired license — `200 OK`
 
@@ -884,7 +941,8 @@ Request:
 ```json
 {
   "licenseKey": "OPEZ-8F4K-92LM-X7PQ",
-  "productName": "My Product"
+  "productName": "My Product",
+  "machineNumber": "PC-ALPHA-01"
 }
 ```
 
@@ -898,6 +956,7 @@ Request:
   "message": "License is valid",
   "licenseKey": "OPEZ-8F4K-92LM-X7PQ",
   "productName": "My Product",
+  "machineNumber": "PC-ALPHA-01",
   "startDate": "2026-09-23T00:00:00.000Z",
   "expiryDate": "2027-09-23T23:59:59.999Z",
   "checkedAt": "2026-09-23T10:00:00.000Z"
@@ -905,7 +964,9 @@ Request:
 ```
 
 `status` is `active`, `pending` or `expired`. An unknown key returns `404` and a
-product mismatch `403`, both with `"status": "invalid"` and a `checkedAt`.
+product mismatch `403`, both with `"status": "invalid"` and a `checkedAt`. A
+request from a machine other than the one that claimed the key returns `403`
+with `"status": "machine_mismatch"`.
 
 Every call re-reads Firestore, so revoking or extending a license in the dashboard
 takes effect on the client's next sync.

@@ -15,6 +15,7 @@ import { formatDate } from '../services/format'
 const COLUMNS = [
   'clientName',
   'licenseKey',
+  'machineNumber',
   'companyName',
   'clientUserId',
   'productName',

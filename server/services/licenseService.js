@@ -15,6 +15,7 @@ function collection() {
 }
 
 const normalizeUserId = (value) => String(value || '').trim().toLowerCase();
+const normalizeMachine = (value) => String(value || '').trim().toLowerCase();
 
 /**
  * username -> { clientName, companyName } for every client account.
@@ -96,6 +97,9 @@ function toPublicLicense(doc, directory) {
     updatedAt: toIso(data.updatedAt),
     startDate: toIso(startDate),
     expiryDate: toIso(data.expiryDate),
+    // The machine this license is locked to. Empty until a product first
+    // verifies with one, which claims it.
+    machineNumber: data.machineNumber || '',
     deactivated,
     status: computeStatus(startDate, data.expiryDate, deactivated),
   };
@@ -141,6 +145,8 @@ async function createLicense(payload) {
     productName: payload.productName,
     soldBy: payload.soldBy,
     duration: period.duration,
+    // Claimed by the first machine that verifies this key.
+    machineNumber: '',
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
     startDate: startTs,
@@ -279,13 +285,21 @@ async function deleteLicense(id) {
  * Shared lookup behind both /verify and /sync. Returns a plain result object
  * rather than throwing, because each outcome maps to a specific response body.
  */
-async function checkLicense({ licenseKey, productName }) {
+/**
+ * Shared lookup behind both /verify and /sync.
+ *
+ * A license is tied to one machine. The first machine to verify a key claims
+ * it, and from then on only that machine can use it — which is what stops one
+ * key being installed on several systems.
+ */
+async function checkLicense({ licenseKey, productName, machineNumber }) {
   const key = normalizeLicenseKey(licenseKey);
   const snap = await collection().where('licenseKey', '==', key).limit(1).get();
 
   if (snap.empty) return { outcome: 'not_found' };
 
-  const license = toPublicLicense(snap.docs[0], await clientDirectory());
+  const doc = snap.docs[0];
+  const license = toPublicLicense(doc, await clientDirectory());
 
   // Product is checked before dates: a key used in the wrong product should say
   // so, rather than leaking that it happens to be expired elsewhere.
@@ -299,6 +313,19 @@ async function checkLicense({ licenseKey, productName }) {
   if (license.status === 'deactivated') return { outcome: 'deactivated', license };
   if (license.status === 'expired') return { outcome: 'expired', license };
   if (license.status === 'pending') return { outcome: 'pending', license };
+
+  const claimed = normalizeMachine(license.machineNumber);
+  const asking = normalizeMachine(machineNumber);
+
+  if (claimed) {
+    // Refusing a request that names no machine matters as much as refusing a
+    // wrong one: otherwise the lock is bypassed by simply omitting the field.
+    if (!asking || asking !== claimed) return { outcome: 'machine_mismatch', license };
+  } else if (asking) {
+    // First use on this key: the machine claims it.
+    await doc.ref.update({ machineNumber: String(machineNumber).trim(), updatedAt: Timestamp.now() });
+    license.machineNumber = String(machineNumber).trim();
+  }
 
   return { outcome: 'valid', license };
 }

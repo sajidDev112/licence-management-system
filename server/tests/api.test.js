@@ -114,6 +114,9 @@ const server = app.listen(0, async () => {
     }
     if (opts.auth !== false && token) headers.Authorization = `Bearer ${token}`
     if (opts.token) headers.Authorization = `Bearer ${opts.token}`
+    // The app trusts one proxy hop, so this sets req.ip. Tests that make many
+    // public calls use it to get their own rate-limit bucket.
+    if (opts.ip) headers['X-Forwarded-For'] = opts.ip
     const res = await fetch(base + url, {
       method,
       headers,
@@ -324,6 +327,85 @@ const server = app.listen(0, async () => {
     check('the key verifies again',
       (await call('POST', '/api/licenses/verify',
         { licenseKey: live.licenseKey }, { auth: false })).body.valid === true)
+
+    console.log('\n-- machine lock --')
+    // Its own IP, so these calls do not eat the shared verify rate limit.
+    const MACHINE_TEST_IP = '203.0.113.7'
+    // A key is claimed by the first machine that verifies it, and only that
+    // machine can use it afterwards. This is what stops one key being installed
+    // on several systems.
+    const mach = (await call('POST', '/api/licenses', newLicense({
+      duration: 'custom', startDate: '2020-01-01', expiryDate: '2099-01-01',
+    }))).body.license
+    check('a new license starts unclaimed', mach.machineNumber === '', mach)
+
+    const firstUse = await call('POST', '/api/licenses/verify',
+      { licenseKey: mach.licenseKey, productName: 'My Product', machineNumber: 'PC-ALPHA-01' },
+      { auth: false, ip: MACHINE_TEST_IP })
+    check('the first machine claims the key',
+      firstUse.status === 200 && firstUse.body.valid === true &&
+        firstUse.body.license.machineNumber === 'PC-ALPHA-01', firstUse.body)
+
+    check('the claim is stored on the license',
+      (await call('GET', `/api/licenses/${mach.id}`)).body.license.machineNumber === 'PC-ALPHA-01')
+
+    const sameAgain = await call('POST', '/api/licenses/verify',
+      { licenseKey: mach.licenseKey, productName: 'My Product', machineNumber: 'PC-ALPHA-01' },
+      { auth: false, ip: MACHINE_TEST_IP })
+    check('the same machine keeps verifying', sameAgain.body.valid === true, sameAgain.body)
+
+    check('machine numbers match regardless of case',
+      (await call('POST', '/api/licenses/verify',
+        { licenseKey: mach.licenseKey, productName: 'My Product', machineNumber: 'pc-alpha-01' },
+        { auth: false, ip: MACHINE_TEST_IP })).body.valid === true)
+
+    const otherMachine = await call('POST', '/api/licenses/verify',
+      { licenseKey: mach.licenseKey, productName: 'My Product', machineNumber: 'PC-BETA-02' },
+      { auth: false, ip: MACHINE_TEST_IP })
+    check('a second machine is refused', otherMachine.status === 403, otherMachine.body)
+    check('and is told why',
+      otherMachine.body.message === 'License is already in use on another machine')
+    check('the refusal does not reveal the claimed machine',
+      !JSON.stringify(otherMachine.body).includes('PC-ALPHA-01'))
+
+    check('omitting the machine on a claimed key is refused too',
+      (await call('POST', '/api/licenses/verify',
+        { licenseKey: mach.licenseKey, productName: 'My Product' }, { auth: false, ip: MACHINE_TEST_IP })).status === 403)
+
+    // snake_case is accepted, since that is how products usually name it.
+    check('machine_number is accepted as well as machineNumber',
+      (await call('POST', '/api/licenses/verify',
+        { licenseKey: mach.licenseKey, productName: 'My Product', machine_number: 'PC-ALPHA-01' },
+        { auth: false, ip: MACHINE_TEST_IP })).body.valid === true)
+
+    const syncSame = await call('POST', '/api/licenses/sync',
+      { licenseKey: mach.licenseKey, machineNumber: 'PC-ALPHA-01' }, { auth: false, ip: MACHINE_TEST_IP })
+    check('sync honours the claimed machine', syncSame.body.valid === true, syncSame.body)
+    check('sync reports the machine back', syncSame.body.machineNumber === 'PC-ALPHA-01')
+
+    const syncOther = await call('POST', '/api/licenses/sync',
+      { licenseKey: mach.licenseKey, machineNumber: 'PC-BETA-02' }, { auth: false, ip: MACHINE_TEST_IP })
+    check('sync refuses a different machine',
+      syncOther.status === 403 && syncOther.body.status === 'machine_mismatch', syncOther.body)
+
+    check('rejects a machine number with invalid characters',
+      (await call('POST', '/api/licenses/verify',
+        { licenseKey: mach.licenseKey, productName: 'My Product', machineNumber: 'bad machine!' },
+        { auth: false, ip: MACHINE_TEST_IP })).status === 400)
+
+    // A key that is not usable is never claimed, so a machine cannot lock
+    // itself to a license it could not have run anyway.
+    const dead = (await call('POST', '/api/licenses', newLicense({
+      duration: 'custom', startDate: '2020-01-01', expiryDate: '2020-02-01',
+    }))).body.license
+    await call('POST', '/api/licenses/verify',
+      { licenseKey: dead.licenseKey, productName: 'My Product', machineNumber: 'PC-GAMMA-03' },
+      { auth: false, ip: MACHINE_TEST_IP })
+    check('an expired key is not claimed',
+      (await call('GET', `/api/licenses/${dead.id}`)).body.license.machineNumber === '')
+
+    await call('DELETE', `/api/licenses/${mach.id}`)
+    await call('DELETE', `/api/licenses/${dead.id}`)
 
     console.log('\n-- clients + stats --')
     const stats = await call('GET', '/api/licenses/stats')

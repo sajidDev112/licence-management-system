@@ -158,11 +158,26 @@ export default function LicenseFormModal({
               <div className="mt-1.5">
                 <LicenseKey value={license.licenseKey} />
               </div>
-              {/* <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                The license key cannot be changed.
-              </p> */}
             </div>
-            <div className="flex justify-start sm:justify-end">
+
+            {/* Read-only: the machine claims the key itself on first use, and
+                letting an admin retype it would defeat the one-machine lock. */}
+            <div className="min-w-0 sm:px-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Machine No.
+              </p>
+              <p className="mt-1.5 text-sm">
+                {license.machineNumber ? (
+                  <span className="break-all font-mono text-slate-800 dark:text-slate-100">
+                    {license.machineNumber}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500">Not claimed yet</span>
+                )}
+              </p>
+            </div>
+
+            <div className="flex shrink-0 justify-start sm:justify-end">
               <StatusSelect
                 status={license.status}
                 onChange={onSetStatus && (() => onSetStatus(license))}

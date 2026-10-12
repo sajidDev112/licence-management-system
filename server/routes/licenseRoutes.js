@@ -50,6 +50,23 @@ const keyCheck = [
     .matches(/^[A-Za-z0-9\s-]+$/)
     .withMessage('License key contains invalid characters'),
   body('productName').optional().trim().escape().isLength({ max: 120 }),
+  // Identifies the machine the product is installed on. Optional on the wire so
+  // a key that has never been claimed still verifies, but once a key is claimed
+  // the service refuses any request that does not carry the matching value.
+  body('machineNumber')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 128 })
+    .withMessage('Machine number is too long')
+    .matches(/^[A-Za-z0-9._:-]+$/)
+    .withMessage('Machine number contains invalid characters'),
+  body('machine_number')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 128 })
+    .withMessage('Machine number is too long')
+    .matches(/^[A-Za-z0-9._:-]+$/)
+    .withMessage('Machine number contains invalid characters'),
 ];
 
 // --- Public (product-facing) -------------------------------------------------

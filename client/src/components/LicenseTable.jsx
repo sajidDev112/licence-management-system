@@ -14,6 +14,19 @@ const COLUMNS = {
     nowrap: true,
     render: (l, ctx) => <LicenseKey value={l.licenseKey} onCopied={ctx.onCopied} showLabel={false} />,
   },
+  machineNumber: {
+    header: 'Machine No.',
+    nowrap: true,
+    // Empty until a machine first verifies the key and claims it.
+    render: (l) =>
+      l.machineNumber ? (
+        <span className="font-mono text-xs text-slate-700 dark:text-slate-200">
+          {l.machineNumber}
+        </span>
+      ) : (
+        <span className="text-slate-400 dark:text-slate-600">Not claimed</span>
+      ),
+  },
   clientName: {
     header: 'Client',
     render: (l) => <span className="font-medium text-slate-900 dark:text-white">{l.clientName}</span>,
@@ -117,6 +130,12 @@ export default function LicenseTable({ licenses, columns, actions, onCopied }) {
             </div>
             <LicenseKey value={license.licenseKey} onCopied={onCopied} />
             <dl className="grid grid-cols-2 gap-y-2 text-sm">
+              <dt className="text-slate-500 dark:text-slate-400">Machine No.</dt>
+              <dd className="truncate text-right font-mono text-xs text-slate-800 dark:text-slate-200">
+                {license.machineNumber || (
+                  <span className="font-sans text-slate-400 dark:text-slate-600">Not claimed</span>
+                )}
+              </dd>
               <dt className="text-slate-500 dark:text-slate-400">User Name</dt>
               <dd className="truncate text-right text-slate-800 dark:text-slate-200">
                 {license.clientUserId}

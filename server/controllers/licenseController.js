@@ -71,13 +71,17 @@ const remove = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'License deleted successfully' });
 });
 
+/** Products may send either spelling of the machine identifier. */
+const readMachineNumber = (body) => body.machineNumber ?? body.machine_number;
+
 /**
  * Public endpoint used by the product. Response shapes are fixed by contract,
  * and no internal fields (document id, client user id, timestamps) are exposed.
  */
 const verify = asyncHandler(async (req, res) => {
   const { licenseKey, productName } = req.body;
-  const result = await licenseService.checkLicense({ licenseKey, productName });
+  const machineNumber = readMachineNumber(req.body);
+  const result = await licenseService.checkLicense({ licenseKey, productName, machineNumber });
 
   if (result.outcome === 'not_found') {
     return res.status(404).json({
@@ -92,6 +96,17 @@ const verify = asyncHandler(async (req, res) => {
       success: false,
       valid: false,
       message: 'License is not valid for this product',
+    });
+  }
+
+  // The key is already in use on another machine. The machine it belongs to is
+  // deliberately not named back: that would hand out a value an attacker could
+  // simply replay.
+  if (result.outcome === 'machine_mismatch') {
+    return res.status(403).json({
+      success: false,
+      valid: false,
+      message: 'License is already in use on another machine',
     });
   }
 
@@ -149,6 +164,7 @@ const verify = asyncHandler(async (req, res) => {
       clientName: result.license.clientName,
       companyName: result.license.companyName,
       productName: result.license.productName,
+      machineNumber: result.license.machineNumber,
       startDate: result.license.startDate,
       expiryDate: result.license.expiryDate,
       status: 'active',
@@ -163,7 +179,8 @@ const verify = asyncHandler(async (req, res) => {
  */
 const sync = asyncHandler(async (req, res) => {
   const { licenseKey, productName } = req.body;
-  const result = await licenseService.checkLicense({ licenseKey, productName });
+  const machineNumber = readMachineNumber(req.body);
+  const result = await licenseService.checkLicense({ licenseKey, productName, machineNumber });
   const checkedAt = new Date().toISOString();
 
   if (result.outcome === 'not_found') {
@@ -186,6 +203,16 @@ const sync = asyncHandler(async (req, res) => {
     });
   }
 
+  if (result.outcome === 'machine_mismatch') {
+    return res.status(403).json({
+      success: false,
+      valid: false,
+      status: 'machine_mismatch',
+      message: 'License is already in use on another machine',
+      checkedAt,
+    });
+  }
+
   const messages = {
     valid: 'License is valid',
     expired: 'License has expired',
@@ -200,6 +227,7 @@ const sync = asyncHandler(async (req, res) => {
     message: messages[result.outcome],
     licenseKey: result.license.licenseKey,
     productName: result.license.productName,
+    machineNumber: result.license.machineNumber,
     startDate: result.license.startDate,
     expiryDate: result.license.expiryDate,
     checkedAt,
