@@ -54,13 +54,19 @@ function CalendarIcon({ className = 'h-[18px] w-[18px]' }) {
   )
 }
 
-function Chevron({ left }) {
+/** `double` is the year step; a single chevron moves by one month. */
+function Chevron({ left, double = false }) {
+  const single = left ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'
+  const pair = left ? 'M18 19l-7-7 7-7M11 19l-7-7 7-7' : 'M6 5l7 7-7 7M13 5l7 7-7 7'
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-      <path strokeLinecap="round" strokeLinejoin="round" d={left ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'} />
+      <path strokeLinecap="round" strokeLinejoin="round" d={double ? pair : single} />
     </svg>
   )
 }
+
+const navButton =
+  'rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
 
 export default function DatePicker({
   id,
@@ -77,6 +83,9 @@ export default function DatePicker({
 
   const [open, setOpen] = useState(false)
   const [view, setView] = useState(() => selected || today)
+  // The header doubles as a year picker: a license can run years out, and
+  // stepping there a month at a time is not realistic.
+  const [pickingYear, setPickingYear] = useState(false)
   const [position, setPosition] = useState(null)
 
   const triggerRef = useRef(null)
@@ -85,7 +94,9 @@ export default function DatePicker({
   // Reopening always lands on the selected month rather than wherever the user
   // last browsed to.
   useEffect(() => {
-    if (open) setView(parseKey(value) || todayParts())
+    if (!open) return
+    setView(parseKey(value) || todayParts())
+    setPickingYear(false)
   }, [open, value])
 
   const place = useCallback(() => {
@@ -152,6 +163,12 @@ export default function DatePicker({
     setView({ y: next.getUTCFullYear(), m: next.getUTCMonth(), d: 1 })
   }
 
+  const shiftYear = (by) => setView((v) => ({ ...v, y: v.y + by }))
+
+  // A 12-year grid, with the viewed year in the second row so there is room
+  // both before and after it.
+  const yearGridStart = view.y - 4
+
   const label = selected
     ? `${pad(selected.d)} ${SHORT_MONTHS[selected.m]} ${selected.y}`
     : placeholder
@@ -207,27 +224,82 @@ export default function DatePicker({
             className="z-[60] rounded-xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"
           >
             <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={() => (pickingYear ? shiftYear(-12) : shiftYear(-1))}
+                  aria-label={pickingYear ? 'Earlier years' : 'Previous year'}
+                  className={navButton}
+                >
+                  <Chevron left double />
+                </button>
+                {!pickingYear && (
+                  <button
+                    type="button"
+                    onClick={() => shiftMonth(-1)}
+                    aria-label="Previous month"
+                    className={navButton}
+                  >
+                    <Chevron left />
+                  </button>
+                )}
+              </div>
+
+              {/* Tapping the title switches to choosing a year outright. */}
               <button
                 type="button"
-                onClick={() => shiftMonth(-1)}
-                aria-label="Previous month"
-                className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                onClick={() => setPickingYear((v) => !v)}
+                aria-label={pickingYear ? 'Back to days' : 'Choose a year'}
+                className="rounded-lg px-2 py-1 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 dark:text-white dark:hover:bg-slate-800"
               >
-                <Chevron left />
+                {pickingYear ? `${yearGridStart} – ${yearGridStart + 11}` : `${MONTHS[view.m]} ${view.y}`}
               </button>
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                {MONTHS[view.m]} {view.y}
-              </p>
-              <button
-                type="button"
-                onClick={() => shiftMonth(1)}
-                aria-label="Next month"
-                className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-              >
-                <Chevron />
-              </button>
+
+              <div className="flex items-center">
+                {!pickingYear && (
+                  <button
+                    type="button"
+                    onClick={() => shiftMonth(1)}
+                    aria-label="Next month"
+                    className={navButton}
+                  >
+                    <Chevron />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => (pickingYear ? shiftYear(12) : shiftYear(1))}
+                  aria-label={pickingYear ? 'Later years' : 'Next year'}
+                  className={navButton}
+                >
+                  <Chevron double />
+                </button>
+              </div>
             </div>
 
+            {pickingYear ? (
+              <div className="grid grid-cols-3 gap-1">
+                {Array.from({ length: 12 }, (_, i) => yearGridStart + i).map((year) => (
+                  <button
+                    key={year}
+                    type="button"
+                    onClick={() => {
+                      setView((v) => ({ ...v, y: year }))
+                      setPickingYear(false)
+                    }}
+                    className={`h-10 rounded-lg text-sm font-medium transition ${
+                      year === view.y
+                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/30 hover:bg-indigo-500'
+                        : year === today.y
+                          ? 'text-indigo-600 ring-1 ring-inset ring-indigo-400 hover:bg-indigo-50 dark:text-indigo-300 dark:ring-indigo-500 dark:hover:bg-indigo-500/10'
+                          : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            ) : (
             <div className="grid grid-cols-7 gap-0.5">
               {WEEKDAYS.map((w) => (
                 <div
@@ -268,6 +340,7 @@ export default function DatePicker({
                 )
               })}
             </div>
+            )}
 
             <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 dark:border-slate-800">
               <button
