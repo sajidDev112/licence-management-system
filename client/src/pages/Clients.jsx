@@ -12,22 +12,6 @@ import { formatDate } from '../services/format'
 const MIN_PASSWORD_LENGTH = 8
 const EMPTY = { clientName: '', companyName: '', username: '', password: '', confirmPassword: '' }
 
-/** Small count chip used in the per-client license breakdown. */
-function CountChip({ value, tone, label }) {
-  if (!value) return null
-  const tones = {
-    active: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
-    pending: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
-    expired: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400',
-    deactivated: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
-  }
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tones[tone]}`}>
-      {value} {label}
-    </span>
-  )
-}
-
 function ClientFormModal({ open, client, onClose, onSubmit }) {
   const isEdit = Boolean(client?.id)
   const [values, setValues] = useState(EMPTY)
@@ -204,7 +188,7 @@ export default function Clients() {
     const q = search.trim().toLowerCase()
     if (!q) return clients
     return clients.filter((c) =>
-      [c.clientName, c.companyName, c.username, ...(c.products || [])]
+      [c.clientName, c.companyName, ...(c.products || [])]
         .filter(Boolean)
         .some((field) => field.toLowerCase().includes(q))
     )
@@ -273,14 +257,13 @@ export default function Clients() {
         <table className="w-full table-auto text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
             <tr>
-              <th className="table-head">Client Name</th>
+              <th className="table-head">POC</th>
               <th className="table-head">Company</th>
-              <th className="table-head">Username</th>
+              <th className="table-head">Email</th>
               <th className="table-head">Password</th>
               <th className="table-head">Login</th>
-              <th className="table-head">Products</th>
-              <th className="table-head">Licenses</th>
-              <th className="table-head">Latest Expiry</th>
+              <th className="table-head">Product</th>
+              <th className="table-head">Expiry Date</th>
               <th className="table-head">Actions</th>
             </tr>
           </thead>
@@ -321,17 +304,6 @@ export default function Clients() {
                   {client.products.join(', ') || (
                     <span className="text-slate-400 dark:text-slate-600">&mdash;</span>
                   )}
-                </td>
-                <td className="px-2 py-3">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <CountChip value={client.activeLicenses} tone="active" label="active" />
-                    <CountChip value={client.pendingLicenses} tone="pending" label="pending" />
-                    <CountChip value={client.expiredLicenses} tone="expired" label="expired" />
-                    <CountChip value={client.deactivatedLicenses} tone="deactivated" label="off" />
-                    {!client.totalLicenses && (
-                      <span className="text-xs text-slate-400 dark:text-slate-600">None</span>
-                    )}
-                  </div>
                 </td>
                 <td className="whitespace-nowrap px-2 py-3 text-slate-600 dark:text-slate-300">
                   {client.latestExpiry ? formatDate(client.latestExpiry) : '—'}
@@ -391,7 +363,7 @@ export default function Clients() {
             <input
               type="search"
               className="input pl-9"
-              placeholder="Search clients"
+              placeholder="Search by POC, company or product"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

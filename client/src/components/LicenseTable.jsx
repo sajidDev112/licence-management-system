@@ -28,11 +28,11 @@ const COLUMNS = {
       ),
   },
   clientName: {
-    header: 'Client',
+    header: 'POC',
     render: (l) => <span className="font-medium text-slate-900 dark:text-white">{l.clientName}</span>,
   },
   companyName: { header: 'Company', render: (l) => l.companyName },
-  clientUserId: { header: 'User Name', render: (l) => l.clientUserId },
+  clientUserId: { header: 'Email', render: (l) => l.clientUserId },
   productName: { header: 'Product', render: (l) => l.productName },
   soldBy: {
     header: 'Sold By',
@@ -136,7 +136,7 @@ export default function LicenseTable({ licenses, columns, actions, onCopied }) {
                   <span className="font-sans text-slate-400 dark:text-slate-600">Not claimed</span>
                 )}
               </dd>
-              <dt className="text-slate-500 dark:text-slate-400">User Name</dt>
+              <dt className="text-slate-500 dark:text-slate-400">Email</dt>
               <dd className="truncate text-right text-slate-800 dark:text-slate-200">
                 {license.clientUserId}
               </dd>

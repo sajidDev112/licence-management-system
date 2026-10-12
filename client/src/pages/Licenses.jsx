@@ -167,7 +167,7 @@ export default function Licenses() {
           onSearch={setSearch}
           status={status}
           onStatus={setStatus}
-          placeholder="Search by name, company, user name or key"
+          placeholder="Search by POC, company, email or key"
         />
         {renderBody()}
       </div>

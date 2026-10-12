@@ -21,7 +21,7 @@ const EMPTY = {
 
 function validateForm(values) {
   const errors = {}
-  if (!values.clientName.trim()) errors.clientName = 'Client name is required'
+  if (!values.clientName.trim()) errors.clientName = 'POC name is required'
   if (!values.productName.trim()) errors.productName = 'Product name is required'
   if (!values.soldBy.trim()) errors.soldBy = 'Sold by is required'
   if (!values.startDate) errors.startDate = 'Start date is required'
@@ -192,14 +192,14 @@ export default function LicenseFormModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="clientName">
-              Client Name <span className="text-red-500">*</span>
+              POC Name <span className="text-red-500">*</span>
             </label>
             {/* Typed freely rather than picked from a list: this exact name is
                 what the Licenses table and the Clients page show. */}
             <input
               id="clientName"
               className={`input ${errors.clientName ? 'border-red-400' : ''}`}
-              placeholder="Name of the client"
+              placeholder="Name of the point of contact"
               value={values.clientName}
               onChange={(e) => setField('clientName', e.target.value)}
             />
