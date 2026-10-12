@@ -28,6 +28,7 @@ Your product never touches Firebase, and never needs an admin token. It only cal
 ## Contents
 
 - [Quick start](#quick-start)
+- [Running on your network (IP address)](#running-on-your-network-ip-address)
 - [Firebase setup](#firebase-setup)
 - [Environment variables](#environment-variables)
 - [Admin console](#admin-console)
@@ -98,6 +99,88 @@ npm start          # serves the API *and* dist/ on one port
 
 `npm start` is the whole application on a single URL. See
 [Deploying to Render](#deploying-to-render).
+
+---
+
+## Running on your network (IP address)
+
+Useful for testing the [one-machine lock](#one-machine-per-license) — you need a
+second computer to hit the API as a different machine.
+
+Both servers already listen on every network interface, so no flag is needed.
+
+### The simple way: one server
+
+```bash
+npm run build
+npm start
+```
+
+The API prints its own LAN address on startup:
+
+```
+License API listening on http://localhost:5000
+                    http://192.168.0.154:5000
+```
+
+Open that URL from any machine on the same network. The dashboard and the API
+are on one port and one origin, so nothing else needs configuring.
+
+### While developing
+
+```bash
+npm run dev
+```
+
+Vite prints a **Network** URL alongside the local one — open that from the other
+machine. Vite proxies `/api` to the backend, so the browser still talks to one
+origin.
+
+The admin API only accepts the origins in `CORS_ORIGIN`, and reaching the
+dashboard by IP is a different origin from `localhost`. **In development this
+machine's own LAN addresses are allowed automatically**, so there is nothing to
+configure — the API lists what it accepted on startup:
+
+```
+Allowed admin origins: http://localhost:5173, http://192.168.0.154:5173, http://192.168.0.154:5000
+```
+
+If a request is still refused with `Origin not allowed` / `CORS_NOT_ALLOWED`,
+compare the origin in your browser's address bar with that line. The usual cause
+is the machine's IP having changed — DHCP moves it between reboots — in which
+case restart the API so it picks up the new address.
+
+In **production** the list is exactly what `CORS_ORIGIN` says and nothing is
+added, which is safe because `npm start` serves the dashboard same-origin. None
+of this applies to `/licenses/verify`, `/licenses/sync`, `/licenses/poc`,
+`/licenses/email` and `/clients/login`, which are public by design.
+
+### Pointing your product at it
+
+```
+VITE_LICENSE_API=http://192.168.0.154:5000/api
+```
+
+### If another machine cannot connect
+
+- **Same network?** Both machines must be on the same Wi-Fi or LAN. A guest
+  network usually blocks device-to-device traffic.
+- **Windows Firewall.** Node needs an inbound rule. Windows normally prompts the
+  first time; if it was dismissed, add one from an **administrator** PowerShell:
+
+  ```powershell
+  New-NetFirewallRule -DisplayName "Opezee License API" -Direction Inbound -Protocol TCP -LocalPort 5000 -Action Allow -Profile Private
+  ```
+
+  Use `-Profile Private` only, and make sure the network is set to **Private**
+  rather than Public — opening a port on a public network exposes it to everyone
+  on that network.
+- **The IP changes.** A DHCP lease can move the address between reboots. Check
+  it again with `ipconfig`, or reserve it on your router.
+
+> This is for a trusted local network. Anyone who can reach the port can reach
+> the dashboard login. For real outside access, deploy it — see
+> [Deploying to Render](#deploying-to-render).
 
 ---
 

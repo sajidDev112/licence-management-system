@@ -11,6 +11,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const { initFirebase } = require('./config/firebase');
 const licenseRoutes = require('./routes/licenseRoutes');
@@ -19,6 +20,14 @@ const clientRoutes = require('./routes/clientRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const { adminLimiter } = require('./middleware/rateLimiter');
 const { ApiError, notFound, errorHandler } = require('./middleware/errorHandler');
+
+/** The machine's own LAN addresses, printed so the URL is easy to share. */
+function lanAddresses() {
+  return Object.values(os.networkInterfaces())
+    .flat()
+    .filter((i) => i && i.family === 'IPv4' && !i.internal)
+    .map((i) => i.address);
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -60,10 +69,25 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // The admin dashboard is restricted to configured origins. The product-facing
 // endpoints are public by design — products call them from anywhere.
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+const configuredOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
+
+/**
+ * In development the dashboard is often opened from another machine by this
+ * one's LAN address, which is a different origin from localhost. Those are
+ * added automatically so testing over the network does not require editing
+ * CORS_ORIGIN — but only in development: in production the list is exactly
+ * what was configured, and there the dashboard is same-origin anyway.
+ */
+function developmentLanOrigins() {
+  if (process.env.NODE_ENV === 'production') return [];
+  const webPort = process.env.WEB_DEV_PORT || 5173;
+  return lanAddresses().flatMap((ip) => [`http://${ip}:${webPort}`, `http://${ip}:${PORT}`]);
+}
+
+const allowedOrigins = [...new Set([...configuredOrigins, ...developmentLanOrigins()])];
 
 const PUBLIC_PATHS = ['/licenses/verify', '/licenses/sync', '/clients/login'];
 
@@ -147,8 +171,11 @@ function start() {
     process.exit(1);
   }
 
-  app.listen(PORT, () => {
+  // '0.0.0.0' is Express's default, but stating it makes the intent clear:
+  // other machines on the network must be able to reach the API.
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`License API listening on http://localhost:${PORT}`);
+    lanAddresses().forEach((ip) => console.log(`                    http://${ip}:${PORT}`));
     console.log(`Allowed admin origins: ${allowedOrigins.join(', ')}`);
     console.log(
       'Public endpoints: POST /api/licenses/verify, POST /api/licenses/sync, POST /api/clients/login'

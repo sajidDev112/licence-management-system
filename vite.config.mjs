@@ -31,6 +31,9 @@ export default defineConfig(({ mode }) => {
     },
 
     server: {
+      // Listen on every interface so the dashboard is reachable from other
+      // machines on the LAN, not just this one. Vite prints the Network URL.
+      host: true,
       port: Number(env.WEB_DEV_PORT) || 5173,
       // Lets the dashboard call a relative /api in development too, so the
       // browser only ever talks to one origin.
