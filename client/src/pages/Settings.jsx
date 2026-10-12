@@ -348,9 +348,9 @@ function EmailFormModal({ open, item, onClose, onSubmit }) {
               <span className="block text-sm font-medium text-slate-800 dark:text-slate-200">
                 Mark as default
               </span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400">
+              {/* <span className="block text-xs text-slate-500 dark:text-slate-400">
                 More than one address can be a default.
-              </span>
+              </span> */}
             </span>
           </label>
         </div>
