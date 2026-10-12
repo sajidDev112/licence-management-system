@@ -115,9 +115,31 @@ async function generateUniqueLicenseKey(attempts = 6) {
   throw new ApiError(500, 'Could not allocate a unique license key', 'KEY_ALLOCATION_FAILED');
 }
 
+/**
+ * The login of the one existing POC account with this name, if there is
+ * exactly one.
+ *
+ * A POC is one person with many licenses, so a license issued by name alone
+ * has to land on that person's account — otherwise the Clients page shows a
+ * second row for them and the product login never sees the license. Two
+ * accounts sharing a name cannot be told apart here; the form makes the
+ * admin pick, and this leaves the license unlinked rather than guess.
+ */
+function soleAccountNamed(directory, clientName) {
+  const name = normalizeUserId(clientName);
+  if (!name) return '';
+  const matches = [...directory.entries()].filter(
+    ([, account]) => normalizeUserId(account.clientName) === name
+  );
+  return matches.length === 1 ? matches[0][0] : '';
+}
+
 async function createLicense(payload) {
   const directory = await clientDirectory();
-  const account = directory.get(normalizeUserId(payload.clientUserId));
+  const clientUserId =
+    normalizeUserId(payload.clientUserId) || soleAccountNamed(directory, payload.clientName);
+  payload = { ...payload, clientUserId };
+  const account = directory.get(clientUserId);
 
   // The name typed on the form wins. A matching client account only fills in
   // what was left blank, so a license can name a client who has no account.
@@ -190,6 +212,16 @@ async function updateLicense(id, payload) {
   // is never allowed to leave it blank.
   if (updates.clientName !== undefined && !String(updates.clientName).trim()) {
     delete updates.clientName;
+  }
+
+  // An unlinked license given an existing POC's name joins that POC, exactly
+  // as a new one would. A license already linked keeps its link.
+  if (!normalizeUserId(updates.clientUserId ?? current.clientUserId)) {
+    const linked = soleAccountNamed(
+      await clientDirectory(),
+      updates.clientName ?? current.clientName
+    );
+    if (linked) updates.clientUserId = linked;
   }
 
   // Any change to the period is re-resolved as a whole, so a new duration

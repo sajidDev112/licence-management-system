@@ -8,7 +8,7 @@ import Modal from '../components/Modal'
 import LicenseKey from '../components/LicenseKey'
 import { EmptyState, ErrorState, TableSkeleton } from '../components/States'
 import { useToast } from '../components/Toast'
-import useLicenses, { filterLicenses, useProducts } from '../hooks/useLicenses'
+import useLicenses, { filterLicenses, useClients, useProducts } from '../hooks/useLicenses'
 import { licenseApi } from '../services/api'
 import { formatDate } from '../services/format'
 
@@ -28,6 +28,8 @@ const COLUMNS = [
 export default function Licenses() {
   const { licenses, loading, error, reload } = useLicenses()
   const { products } = useProducts()
+  // Existing POCs, so a new license can be filed under one instead of a duplicate.
+  const { clients, reload: reloadClients } = useClients()
 
   const toast = useToast()
 
@@ -73,7 +75,7 @@ export default function Licenses() {
         toast.success('License created successfully')
       }
       closeForm()
-      await reload({ silent: true })
+      await Promise.all([reload({ silent: true }), reloadClients({ silent: true })])
     } catch (err) {
       toast.error(err.message)
     }
@@ -159,6 +161,7 @@ export default function Licenses() {
         open={formOpen}
         license={editing}
         products={products}
+        clients={clients}
         onClose={closeForm}
         onSubmit={handleSubmit}
       />

@@ -19,6 +19,25 @@ const EMPTY = {
   expiryDate: '',
 }
 
+const sameName = (a, b) =>
+  String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
+
+/**
+ * The POC account a license should be filed under, given the accounts whose
+ * name matches what was typed.
+ *
+ * One match is that POC. Several need the admin's pick, which `chosen` holds.
+ * None means a new POC — or, when editing, a rename that keeps the license's
+ * existing link.
+ */
+function resolvePocLink(accounts, chosen, editing) {
+  if (accounts.length === 1) return accounts[0].username
+  if (accounts.length > 1) {
+    return accounts.some((a) => sameName(a.username, chosen)) ? chosen : ''
+  }
+  return editing?.clientUserId || ''
+}
+
 function validateForm(values) {
   const errors = {}
   if (!values.clientName.trim()) errors.clientName = 'POC name is required'
@@ -46,6 +65,7 @@ export default function LicenseFormModal({
   open,
   license,
   products = [],
+  clients = [],
   onClose,
   onSubmit,
 }) {
@@ -90,9 +110,29 @@ export default function LicenseFormModal({
   const isCustom = values.duration === 'custom'
   const shownExpiry = isCustom ? values.expiryDate : computedExpiry
 
+  // A POC is one person with many licenses. Typing an existing POC's name
+  // links the license to that POC's account, so the Clients page keeps one row
+  // for them and their product login sees the new license.
+  const pocNames = useMemo(
+    () => [...new Set(clients.map((c) => c.clientName).filter(Boolean))].sort(),
+    [clients]
+  )
+  const pocAccounts = useMemo(
+    () =>
+      clients.filter(
+        (c) => c.hasLogin && c.username && sameName(c.clientName, values.clientName)
+      ),
+    [clients, values.clientName]
+  )
+  const linkedUserId = resolvePocLink(pocAccounts, values.clientUserId, isEdit ? license : null)
+  const linkedAccount = pocAccounts.find((c) => sameName(c.username, linkedUserId))
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     const found = validateForm(values)
+    if (!found.clientName && pocAccounts.length > 1 && !linkedUserId) {
+      found.clientName = 'More than one POC has this name — choose which one'
+    }
     setErrors(found)
     if (Object.keys(found).length) return
 
@@ -101,10 +141,9 @@ export default function LicenseFormModal({
       await onSubmit(
         {
           clientName: values.clientName.trim(),
-          // Only sent when the license already has one. It links the license to a
-          // client account for the product login, and the form no longer asks for
-          // it, so a new license simply has none.
-          ...(values.clientUserId.trim() ? { clientUserId: values.clientUserId.trim() } : {}),
+          // The existing POC account this license belongs to, when there is one.
+          // A brand-new POC has none until a login is set up for them.
+          ...(linkedUserId ? { clientUserId: linkedUserId } : {}),
           productName: values.productName.trim(),
           soldBy: values.soldBy.trim(),
           duration: values.duration,
@@ -209,16 +248,49 @@ export default function LicenseFormModal({
             <label className="label" htmlFor="clientName">
               POC Name <span className="text-red-500">*</span>
             </label>
-            {/* Typed freely rather than picked from a list: this exact name is
-                what the Licenses table and the Clients page show. */}
+            {/* Typed, with existing POCs suggested: picking one files this
+                license under that POC instead of starting a new one. */}
             <input
               id="clientName"
               className={`input ${errors.clientName ? 'border-red-400' : ''}`}
               placeholder="Name of the point of contact"
+              list="poc-names"
+              autoComplete="off"
               value={values.clientName}
               onChange={(e) => setField('clientName', e.target.value)}
             />
-            {fieldError('clientName')}
+            <datalist id="poc-names">
+              {pocNames.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+            {pocAccounts.length > 1 && (
+              <select
+                className="input mt-2"
+                aria-label="Which POC"
+                value={linkedUserId}
+                onChange={(e) => {
+                  setField('clientUserId', e.target.value)
+                  setErrors((prev) => ({ ...prev, clientName: undefined }))
+                }}
+              >
+                <option value="">Choose which {values.clientName.trim()}…</option>
+                {pocAccounts.map((c) => (
+                  <option key={c.username} value={c.username}>
+                    {[c.companyName, c.username].filter(Boolean).join(' · ')}
+                  </option>
+                ))}
+              </select>
+            )}
+            {fieldError('clientName') ||
+              (linkedAccount && pocAccounts.length === 1 ? (
+                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                  Existing POC ·{' '}
+                  {[linkedAccount.companyName, linkedAccount.username].filter(Boolean).join(' · ')}
+                </p>
+              ) : !isEdit && values.clientName.trim() && !pocAccounts.length ? (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">New POC</p>
+              ) : null)}
           </div>
 
           <div>

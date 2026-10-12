@@ -657,6 +657,36 @@ const server = app.listen(0, async () => {
     check('they gather on a single client row',
       pocRows.length === 1 && pocRows[0].totalLicenses === 2, pocRows)
 
+    // The Create License form may send only the POC name. That must still land
+    // on the existing POC, not start a look-alike login-less one.
+    const byName = await call('POST', '/api/licenses', newLicense({
+      clientName: 'UNIQUE POC ', clientUserId: undefined, companyName: undefined, duration: 'custom', startDate: '2020-01-01', expiryDate: '2099-01-01',
+    }))
+    check('a license issued by POC name alone links to that POC',
+      byName.status === 201 && byName.body.license.clientUserId === 'poc.one@test.com', byName.body)
+    check('and picks up the POC company',
+      byName.body.license.companyName === 'Poc Co One Renamed', byName.body.license)
+    const pocRowsAfter = (await call('GET', '/api/clients')).body.clients
+      .filter((c) => (c.clientName || '').toLowerCase().trim() === 'unique poc')
+    check('no second row appears for that POC',
+      pocRowsAfter.length === 1 && pocRowsAfter[0].totalLicenses === 3, pocRowsAfter)
+    const pocLogin = await call('POST', '/api/clients/login',
+      { username: 'poc.one@test.com', password: 'PocPass12345' }, { auth: false })
+    check("the POC's product login sees the new license",
+      pocLogin.body.licenses.some((l) => l.licenseKey === byName.body.license.licenseKey),
+      pocLogin.body.licenses)
+
+    // An unlinked license renamed to an existing POC joins that POC on save.
+    const stray = await call('POST', '/api/licenses', newLicense({
+      clientName: 'Nobody Yet', clientUserId: undefined, duration: 'custom', startDate: '2020-01-01', expiryDate: '2099-01-01',
+    }))
+    check('a new POC name stays unlinked', stray.body.license.clientUserId === '', stray.body.license)
+    const joined = await call('PUT', `/api/licenses/${stray.body.license.id}`, { clientName: 'Unique Poc' })
+    check('renaming it to an existing POC links it',
+      joined.body.license.clientUserId === 'poc.one@test.com', joined.body)
+
+    await call('DELETE', `/api/licenses/${byName.body.license.id}`)
+    await call('DELETE', `/api/licenses/${stray.body.license.id}`)
     await call('DELETE', `/api/licenses/${lic1.body.license.id}`)
     await call('DELETE', `/api/licenses/${lic2.body.license.id}`)
     await call('DELETE', `/api/clients/${poc1.body.client.id}`)
