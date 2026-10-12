@@ -998,6 +998,87 @@ curl -X POST http://localhost:5000/api/licenses/sync \
 
 ---
 
+### Self-service endpoints (public)
+
+Two endpoints the **product itself** calls to correct the details it holds — for
+example from a settings screen in an Electron app. Whatever they change shows on
+the dashboard immediately.
+
+```http
+PUT /api/licenses/poc      # change the POC name
+PUT /api/licenses/email    # change the email
+```
+
+They are separate on purpose: a product can change one without sending the
+other, so it can never blank a field it did not mean to touch.
+
+#### Authentication
+
+There is no admin token. The caller proves it is the holder with the same pair
+`/verify` uses — **the license key and the machine that claimed it**:
+
+```json
+{
+  "licenseKey": "OPEZ-8F4K-92LM-X7PQ",
+  "machineNumber": "PC-ALPHA-01",
+  "pocName": "Sajid Parwez"
+}
+```
+
+```json
+{
+  "licenseKey": "OPEZ-8F4K-92LM-X7PQ",
+  "machineNumber": "PC-ALPHA-01",
+  "email": "sajid@example.com"
+}
+```
+
+`machine_number` and `poc_name` are accepted as spellings of the same fields.
+`productName` is optional and checked when present.
+
+#### Response — `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "POC name updated",
+  "license": {
+    "licenseKey": "OPEZ-8F4K-92LM-X7PQ",
+    "pocName": "Sajid Parwez",
+    "email": "sajid@example.com",
+    "productName": "My Product",
+    "machineNumber": "PC-ALPHA-01"
+  }
+}
+```
+
+#### Refusals
+
+| Status | `code` | When |
+| ------ | ------ | ---- |
+| `404` | `LICENSE_NOT_FOUND` | No such key |
+| `403` | `LICENSE_NOT_CLAIMED` | The key has never been activated, so there is no machine to prove ownership |
+| `403` | `MACHINE_MISMATCH` | The request came from a different machine |
+| `403` | `LICENSE_NOT_ACTIVE` | Expired, deactivated or not started yet |
+| `403` | `PRODUCT_MISMATCH` | `productName` was sent and does not match |
+| `409` | `EMAIL_TAKEN` | Another client account already signs in with that email |
+| `400` | `VALIDATION_ERROR` | Missing or malformed field |
+
+Rate limited to **20 requests per minute per IP**, same as `/verify`.
+
+#### What gets written
+
+The license record is updated, and **the linked client account too** when the
+license belongs to one — so the Clients page and the product login stay in step
+with the Licenses page rather than drifting apart. Changing the email therefore
+changes what that client signs in with.
+
+> These endpoints can only ever touch the single license whose key *and* machine
+> both match, and only while it is active. Anyone able to call them already has
+> the key and is running on the claimed machine.
+
+---
+
 ## Integrating your product
 
 Your product calls exactly three endpoints. None of them needs an admin token,

@@ -89,7 +89,13 @@ function developmentLanOrigins() {
 
 const allowedOrigins = [...new Set([...configuredOrigins, ...developmentLanOrigins()])];
 
-const PUBLIC_PATHS = ['/licenses/verify', '/licenses/sync', '/clients/login'];
+const PUBLIC_PATHS = [
+  '/licenses/verify',
+  '/licenses/sync',
+  '/licenses/poc',
+  '/licenses/email',
+  '/clients/login',
+];
 
 const adminCors = cors({
   origin(origin, callback) {

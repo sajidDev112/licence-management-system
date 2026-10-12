@@ -407,6 +407,75 @@ const server = app.listen(0, async () => {
     await call('DELETE', `/api/licenses/${mach.id}`)
     await call('DELETE', `/api/licenses/${dead.id}`)
 
+    console.log('\n-- product self-service (POC + email) --')
+    const SELF_IP = '203.0.113.9'
+    const self = (await call('POST', '/api/licenses', newLicense({
+      clientName: 'Old Name', clientUserId: 'old.contact@test.com',
+      duration: 'custom', startDate: '2020-01-01', expiryDate: '2099-01-01',
+    }))).body.license
+
+    const noToken = await call('PUT', '/api/licenses/poc',
+      { licenseKey: self.licenseKey, machineNumber: 'SELF-PC-1', pocName: 'X' },
+      { auth: false, ip: SELF_IP })
+    check('the endpoints need no admin token',
+      noToken.status !== 401 && noToken.body.code !== 'NO_TOKEN', noToken.body)
+    check('an unclaimed license cannot be edited',
+      (await call('PUT', '/api/licenses/poc',
+        { licenseKey: self.licenseKey, machineNumber: 'SELF-PC-1', pocName: 'X' },
+        { auth: false, ip: SELF_IP })).body.code === 'LICENSE_NOT_CLAIMED')
+
+    await call('POST', '/api/licenses/verify',
+      { licenseKey: self.licenseKey, productName: 'My Product', machineNumber: 'SELF-PC-1' },
+      { auth: false, ip: SELF_IP })
+
+    const poc = await call('PUT', '/api/licenses/poc',
+      { licenseKey: self.licenseKey, machineNumber: 'SELF-PC-1', pocName: 'New Name' },
+      { auth: false, ip: SELF_IP })
+    check('the claimed machine can change the POC name',
+      poc.status === 200 && poc.body.license.pocName === 'New Name', poc.body)
+
+    const mail = await call('PUT', '/api/licenses/email',
+      { licenseKey: self.licenseKey, machineNumber: 'SELF-PC-1', email: 'new.contact@test.com' },
+      { auth: false, ip: SELF_IP })
+    check('and the email', mail.status === 200 && mail.body.license.email === 'new.contact@test.com', mail.body)
+
+    const saved = (await call('GET', `/api/licenses/${self.id}`)).body.license
+    check('both changes are saved on the license',
+      saved.clientName === 'New Name' && saved.clientUserId === 'new.contact@test.com', saved)
+    check('changing one does not clear the other',
+      saved.clientName === 'New Name' && saved.productName === 'My Product')
+
+    check('a different machine is refused',
+      (await call('PUT', '/api/licenses/poc',
+        { licenseKey: self.licenseKey, machineNumber: 'SELF-PC-2', pocName: 'Nope' },
+        { auth: false, ip: SELF_IP })).status === 403)
+    check('an unknown key is refused',
+      (await call('PUT', '/api/licenses/poc',
+        { licenseKey: 'OPEZ-0000-0000-0000', machineNumber: 'SELF-PC-1', pocName: 'Nope' },
+        { auth: false, ip: SELF_IP })).status === 404)
+    check('the wrong product is refused',
+      (await call('PUT', '/api/licenses/poc',
+        { licenseKey: self.licenseKey, machineNumber: 'SELF-PC-1', productName: 'Other', pocName: 'Nope' },
+        { auth: false, ip: SELF_IP })).status === 403)
+    check('a malformed email is refused',
+      (await call('PUT', '/api/licenses/email',
+        { licenseKey: self.licenseKey, machineNumber: 'SELF-PC-1', email: 'not-an-email' },
+        { auth: false, ip: SELF_IP })).status === 400)
+    check('an empty POC name is refused',
+      (await call('PUT', '/api/licenses/poc',
+        { licenseKey: self.licenseKey, machineNumber: 'SELF-PC-1', pocName: '' },
+        { auth: false, ip: SELF_IP })).status === 400)
+
+    // A switched-off license cannot rewrite its own record.
+    await call('PUT', `/api/licenses/${self.id}/status`, { deactivated: true })
+    check('a deactivated license cannot be edited',
+      (await call('PUT', '/api/licenses/poc',
+        { licenseKey: self.licenseKey, machineNumber: 'SELF-PC-1', pocName: 'Nope' },
+        { auth: false, ip: SELF_IP })).status === 403)
+    await call('PUT', `/api/licenses/${self.id}/status`, { deactivated: false })
+
+    await call('DELETE', `/api/licenses/${self.id}`)
+
     console.log('\n-- clients + stats --')
     const stats = await call('GET', '/api/licenses/stats')
     check('stats counts pending separately', stats.body.stats.pendingLicenses === 1, stats.body.stats)

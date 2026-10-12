@@ -330,6 +330,90 @@ async function checkLicense({ licenseKey, productName, machineNumber }) {
   return { outcome: 'valid', license };
 }
 
+
+/**
+ * Self-service updates made by the product itself, not by an admin.
+ *
+ * The caller proves it is entitled with the same pair /verify uses: the license
+ * key plus the machine that claimed it. There is no token — the product holds
+ * no admin credentials — so these endpoints can only ever touch the one license
+ * whose key and machine both match, and only while that license is usable.
+ *
+ * Whatever the product changes is also written to the linked client account
+ * when there is one, so the Clients page and the product login stay in step
+ * with the Licenses page rather than drifting apart.
+ */
+async function updateLicenseContact({ licenseKey, machineNumber, productName, clientName, clientUserId }) {
+  const key = normalizeLicenseKey(licenseKey);
+  const snap = await collection().where('licenseKey', '==', key).limit(1).get();
+  if (snap.empty) throw new ApiError(404, 'Invalid license key', 'LICENSE_NOT_FOUND');
+
+  const ref = snap.docs[0].ref;
+  const current = toPublicLicense(snap.docs[0], await clientDirectory());
+
+  if (
+    productName &&
+    current.productName.trim().toLowerCase() !== String(productName).trim().toLowerCase()
+  ) {
+    throw new ApiError(403, 'License is not valid for this product', 'PRODUCT_MISMATCH');
+  }
+
+  // A license that cannot be used cannot be edited either: an expired or
+  // switched-off installation has no business rewriting its own record.
+  if (current.status !== 'active') {
+    throw new ApiError(403, `License is ${current.status}`, 'LICENSE_NOT_ACTIVE');
+  }
+
+  // The machine lock is the authentication here, so it is required — an
+  // unclaimed license has nobody to prove they are the holder.
+  const claimed = normalizeMachine(current.machineNumber);
+  if (!claimed) {
+    throw new ApiError(
+      403,
+      'This license has not been activated on a machine yet',
+      'LICENSE_NOT_CLAIMED'
+    );
+  }
+  if (normalizeMachine(machineNumber) !== claimed) {
+    throw new ApiError(403, 'License is already in use on another machine', 'MACHINE_MISMATCH');
+  }
+
+  const updates = { updatedAt: Timestamp.now() };
+  if (clientName !== undefined) updates.clientName = String(clientName).trim();
+  if (clientUserId !== undefined) updates.clientUserId = String(clientUserId).trim();
+
+  // Keep the linked client account in step, matched on the user id the license
+  // had *before* this change.
+  const clients = getDb().collection('clients');
+  const accountSnap = await clients
+    .where('username', '==', normalizeUserId(current.clientUserId))
+    .limit(1)
+    .get();
+
+  if (!accountSnap.empty) {
+    const account = accountSnap.docs[0];
+    const accountUpdates = { updatedAt: Timestamp.now() };
+
+    if (updates.clientName) accountUpdates.clientName = updates.clientName;
+
+    if (updates.clientUserId !== undefined) {
+      const nextUsername = normalizeUserId(updates.clientUserId);
+      // The username is how the client signs in to the product, so it still has
+      // to be unique even when the product is the one changing it.
+      const clash = await clients.where('username', '==', nextUsername).limit(1).get();
+      if (!clash.empty && clash.docs[0].id !== account.id) {
+        throw new ApiError(409, 'That email is already in use', 'EMAIL_TAKEN');
+      }
+      accountUpdates.username = nextUsername;
+    }
+
+    await account.ref.update(accountUpdates);
+  }
+
+  await ref.update(updates);
+  return toPublicLicense(await ref.get(), await clientDirectory());
+}
+
 async function getStats() {
   const licenses = await listLicenses();
   const active = licenses.filter((l) => l.status === 'active').length;
@@ -403,6 +487,7 @@ module.exports = {
   deleteLicense,
   adoptUnlinkedLicenses,
   checkLicense,
+  updateLicenseContact,
   getStats,
   listClients,
   computeStatus,

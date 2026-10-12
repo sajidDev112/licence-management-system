@@ -234,6 +234,58 @@ const sync = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Two self-service endpoints the product calls to correct the details it holds.
+ * Both authenticate the same way: the license key plus the machine that claimed
+ * it. Kept as separate endpoints so a product can change one without having to
+ * send, and risk overwriting, the other.
+ */
+const updatePoc = asyncHandler(async (req, res) => {
+  const { licenseKey, productName } = req.body;
+  // Accepts either name for the field, as the two endpoints are a pair.
+  const pocName = req.body.pocName ?? req.body.poc_name ?? req.body.clientName;
+  const license = await licenseService.updateLicenseContact({
+    licenseKey,
+    machineNumber: readMachineNumber(req.body),
+    productName,
+    clientName: pocName,
+  });
+
+  res.json({
+    success: true,
+    message: 'POC name updated',
+    license: {
+      licenseKey: license.licenseKey,
+      pocName: license.clientName,
+      email: license.clientUserId,
+      productName: license.productName,
+      machineNumber: license.machineNumber,
+    },
+  });
+});
+
+const updateEmail = asyncHandler(async (req, res) => {
+  const { licenseKey, productName, email } = req.body;
+  const license = await licenseService.updateLicenseContact({
+    licenseKey,
+    machineNumber: readMachineNumber(req.body),
+    productName,
+    clientUserId: email,
+  });
+
+  res.json({
+    success: true,
+    message: 'Email updated',
+    license: {
+      licenseKey: license.licenseKey,
+      pocName: license.clientName,
+      email: license.clientUserId,
+      productName: license.productName,
+      machineNumber: license.machineNumber,
+    },
+  });
+});
+
 module.exports = {
   create,
   list,
@@ -245,5 +297,7 @@ module.exports = {
   mailStatus,
   remove,
   verify,
+  updatePoc,
+  updateEmail,
   sync,
 };

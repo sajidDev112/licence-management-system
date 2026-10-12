@@ -74,6 +74,49 @@ const keyCheck = [
 router.post('/verify', verifyLimiter, keyCheck, validate, controller.verify);
 router.post('/sync', verifyLimiter, keyCheck, validate, controller.sync);
 
+// Self-service: the product corrects its own contact details. Authenticated by
+// the license key and the machine that claimed it, so no admin token is needed.
+// Declared here, before the admin guard and before the `/:id` routes, so the
+// paths are not swallowed by either.
+router.put(
+  '/poc',
+  verifyLimiter,
+  [
+    ...keyCheck,
+    body('pocName').optional({ values: 'falsy' }).trim().escape().isLength({ max: 120 }),
+    body('poc_name').optional({ values: 'falsy' }).trim().escape().isLength({ max: 120 }),
+    body('clientName').optional({ values: 'falsy' }).trim().escape().isLength({ max: 120 }),
+    body().custom((value) => {
+      if (!value.pocName && !value.poc_name && !value.clientName) {
+        throw new Error('POC name is required');
+      }
+      return true;
+    }),
+  ],
+  validate,
+  controller.updatePoc
+);
+
+router.put(
+  '/email',
+  verifyLimiter,
+  [
+    ...keyCheck,
+    body('email')
+      .trim()
+      .notEmpty()
+      .withMessage('Email is required')
+      .isEmail()
+      .withMessage('Enter a valid email address')
+      .isLength({ max: 160 })
+      // Deliberately NOT normalizeEmail(): it strips dots from gmail addresses,
+      // so 'a.b@gmail.com' would be silently saved as 'ab@gmail.com'.
+      .customSanitizer((v) => String(v).trim().toLowerCase()),
+  ],
+  validate,
+  controller.updateEmail
+);
+
 // --- Admin -------------------------------------------------------------------
 router.use(requireAdmin);
 
