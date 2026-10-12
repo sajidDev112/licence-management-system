@@ -12,8 +12,15 @@ export default function ConfirmDialog({
   onCancel,
 }) {
   return (
-    <Modal open={open} title={title} onClose={busy ? () => {} : onCancel} maxWidth="max-w-md">
-      <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{message}</p>
+    <Modal
+      open={open}
+      title={title}
+      onClose={busy ? () => {} : onCancel}
+      maxWidth="max-w-md"
+      showClose={false}
+      showDivider={false}
+    >
+      <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300 -mt-7">{message}</p>
       <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button type="button" className="btn-secondary" onClick={onCancel} disabled={busy}>
           Cancel
