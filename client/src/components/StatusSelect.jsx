@@ -3,7 +3,8 @@
  * two states an admin can actually choose between.
  *
  * The table only displays the status now, so this is the one place it changes —
- * which keeps a stray click in a long list from cutting a client off.
+ * which keeps a stray click in a long list from cutting a client off. Picking
+ * an option only changes the form; the popup applies it on Save Changes.
  *
  * Expired and pending come from the dates, not from a switch, so the dropdown
  * is disabled there and simply states where the license stands.
@@ -40,7 +41,7 @@ export default function StatusSelect({ status, onChange }) {
       value={switchable ? status : 'current'}
       disabled={disabled}
       aria-label="License status"
-      onChange={(e) => onChange(e.target.value === 'deactivated')}
+      onChange={(e) => onChange(e.target.value)}
       className={`input w-auto min-w-[9.5rem] cursor-pointer py-1.5 text-sm font-semibold ${
         TEXT[status] || TEXT.expired
       } ${disabled ? 'cursor-not-allowed opacity-80' : ''}`}

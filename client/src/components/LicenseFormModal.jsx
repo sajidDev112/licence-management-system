@@ -48,10 +48,12 @@ export default function LicenseFormModal({
   products = [],
   onClose,
   onSubmit,
-  onSetStatus,
 }) {
   const isEdit = Boolean(license)
   const [values, setValues] = useState(EMPTY)
+  // The status picked in the dropdown. Held here until Save Changes, so
+  // choosing an option on its own changes nothing on the server.
+  const [deactivated, setDeactivated] = useState(false)
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -59,6 +61,7 @@ export default function LicenseFormModal({
   useEffect(() => {
     if (!open) return
     setErrors({})
+    setDeactivated(Boolean(license?.deactivated))
     setValues(
       license
         ? {
@@ -95,19 +98,23 @@ export default function LicenseFormModal({
 
     setSubmitting(true)
     try {
-      await onSubmit({
-        clientName: values.clientName.trim(),
-        // Only sent when the license already has one. It links the license to a
-        // client account for the product login, and the form no longer asks for
-        // it, so a new license simply has none.
-        ...(values.clientUserId.trim() ? { clientUserId: values.clientUserId.trim() } : {}),
-        productName: values.productName.trim(),
-        soldBy: values.soldBy.trim(),
-        duration: values.duration,
-        startDate: values.startDate,
-        // The backend recomputes this for presets; sending it keeps custom working.
-        ...(isCustom ? { expiryDate: values.expiryDate } : {}),
-      })
+      await onSubmit(
+        {
+          clientName: values.clientName.trim(),
+          // Only sent when the license already has one. It links the license to a
+          // client account for the product login, and the form no longer asks for
+          // it, so a new license simply has none.
+          ...(values.clientUserId.trim() ? { clientUserId: values.clientUserId.trim() } : {}),
+          productName: values.productName.trim(),
+          soldBy: values.soldBy.trim(),
+          duration: values.duration,
+          startDate: values.startDate,
+          // The backend recomputes this for presets; sending it keeps custom working.
+          ...(isCustom ? { expiryDate: values.expiryDate } : {}),
+        },
+        // Status has its own endpoint, so it travels beside the fields.
+        isEdit ? { deactivated } : undefined
+      )
     } finally {
       setSubmitting(false)
     }
@@ -178,9 +185,17 @@ export default function LicenseFormModal({
             </div>
 
             <div className="flex shrink-0 justify-start sm:justify-end">
+              {/* Expired and pending are not switchable, so the pending choice
+                  only replaces the status shown when it is active/deactivated. */}
               <StatusSelect
-                status={license.status}
-                onChange={onSetStatus && (() => onSetStatus(license))}
+                status={
+                  license.status === 'active' || license.status === 'deactivated'
+                    ? deactivated
+                      ? 'deactivated'
+                      : 'active'
+                    : license.status
+                }
+                onChange={(next) => setDeactivated(next === 'deactivated')}
               />
               {/* <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
                 Created {formatDate(license.createdAt)}

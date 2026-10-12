@@ -37,9 +37,6 @@ export default function Licenses() {
   // `editing` drives both the View popup and Create — a null value means create.
   const [editing, setEditing] = useState(null)
   const [deleting, setDeleting] = useState(null)
-  // The license whose on/off state is awaiting confirmation.
-  const [toggling, setToggling] = useState(null)
-  const [toggleBusy, setToggleBusy] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [created, setCreated] = useState(null)
 
@@ -61,10 +58,14 @@ export default function Licenses() {
     setEditing(null)
   }
 
-  const handleSubmit = async (values) => {
+  const handleSubmit = async (values, { deactivated } = {}) => {
     try {
       if (editing) {
         await licenseApi.update(editing.id, values)
+        // The status dropdown only takes effect here, on Save Changes.
+        const statusChanged =
+          deactivated !== undefined && deactivated !== Boolean(editing.deactivated)
+        if (statusChanged) await licenseApi.setStatus(editing.id, deactivated)
         toast.success('License updated successfully')
       } else {
         // Surface the generated key immediately — the admin needs to send it on.
@@ -75,24 +76,6 @@ export default function Licenses() {
       await reload({ silent: true })
     } catch (err) {
       toast.error(err.message)
-    }
-  }
-
-  const handleToggleStatus = async () => {
-    const next = !toggling.deactivated
-    setToggleBusy(true)
-    try {
-      const updated = await licenseApi.setStatus(toggling.id, next)
-      toast.success(next ? 'License set to deactive' : 'License reactivated')
-      setToggling(null)
-      // The details popup stays open behind the confirmation, so its copy of
-      // the license has to pick up the new status too.
-      setEditing((current) => (current && current.id === updated.id ? updated : current))
-      await reload({ silent: true })
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setToggleBusy(false)
     }
   }
 
@@ -178,24 +161,6 @@ export default function Licenses() {
         products={products}
         onClose={closeForm}
         onSubmit={handleSubmit}
-        onSetStatus={(license) => setToggling(license)}
-      />
-
-      <ConfirmDialog
-        open={Boolean(toggling)}
-        busy={toggleBusy}
-        title={toggling?.deactivated ? 'Reactivate this license?' : 'Make this license deactive?'}
-        confirmLabel={toggling?.deactivated ? 'Reactivate' : 'Deactive'}
-        tone={toggling?.deactivated ? 'primary' : 'danger'}
-        message={
-          toggling
-            ? toggling.deactivated
-              ? `${toggling.licenseKey} will start verifying again, so ${toggling.clientName} regains access on their product's next check.`
-              : `${toggling.licenseKey} will stop verifying immediately. ${toggling.clientName} loses access the next time their product checks in. You can reactivate it at any time.`
-            : ''
-        }
-        onConfirm={handleToggleStatus}
-        onCancel={() => setToggling(null)}
       />
 
       <ConfirmDialog
