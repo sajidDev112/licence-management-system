@@ -1,12 +1,30 @@
 'use strict';
 
 const licenseService = require('../services/licenseService');
+const clientService = require('../services/clientService');
 const mailService = require('../services/mailService');
 const brandingService = require('../services/brandingService');
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
+/**
+ * The license form carries the POC's sign-in for the product: a password
+ * alongside the email and company. The account is saved first, so a clash
+ * (an email or company already used by another POC) stops the license too.
+ */
+async function savePocFrom(body, previousEmail) {
+  if (!body.password) return;
+  await clientService.savePocAccount({
+    clientName: body.clientName,
+    companyName: body.companyName,
+    email: body.clientUserId,
+    password: body.password,
+    previousEmail,
+  });
+}
+
 const create = asyncHandler(async (req, res) => {
+  await savePocFrom(req.body);
   const license = await licenseService.createLicense(req.body);
   res.status(201).json({ success: true, message: 'License created successfully', license });
 });
@@ -26,6 +44,10 @@ const getOne = asyncHandler(async (req, res) => {
 });
 
 const update = asyncHandler(async (req, res) => {
+  if (req.body.password) {
+    const current = await licenseService.getLicenseById(req.params.id);
+    await savePocFrom(req.body, current.clientUserId);
+  }
   const license = await licenseService.updateLicense(req.params.id, req.body);
   res.json({ success: true, message: 'License updated successfully', license });
 });

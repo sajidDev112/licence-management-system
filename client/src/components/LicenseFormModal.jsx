@@ -9,9 +9,13 @@ import { DURATIONS, formatDate, previewExpiry, toDateInput } from '../services/f
 
 const today = () => new Date().toISOString().slice(0, 10)
 
+const MIN_PASSWORD_LENGTH = 8
+
 const EMPTY = {
   clientName: '',
   clientUserId: '',
+  companyName: '',
+  password: '',
   productName: '',
   soldBy: '',
   duration: '1_year',
@@ -22,26 +26,31 @@ const EMPTY = {
 const sameName = (a, b) =>
   String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
 
-/**
- * The POC account a license should be filed under, given the accounts whose
- * name matches what was typed.
- *
- * One match is that POC. Several need the admin's pick, which `chosen` holds.
- * None means a new POC — or, when editing, a rename that keeps the license's
- * existing link.
- */
-function resolvePocLink(accounts, chosen, editing) {
-  if (accounts.length === 1) return accounts[0].username
-  if (accounts.length > 1) {
-    return accounts.some((a) => sameName(a.username, chosen)) ? chosen : ''
-  }
-  return editing?.clientUserId || ''
-}
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** POC accounts with a product login whose name matches `name`. */
+const accountsNamed = (clients, name) =>
+  clients.filter((c) => c.hasLogin && c.username && sameName(c.clientName, name))
+
+/** The POC's sign-in fields, as an existing account fills them in. */
+const POC_FIELDS = ['clientUserId', 'companyName', 'password']
+const pocFieldsOf = (account) => ({
+  clientUserId: account?.username || '',
+  companyName: account?.companyName || '',
+  password: account?.password || '',
+})
 
 function validateForm(values) {
   const errors = {}
-  if (!values.clientName.trim()) errors.clientName = 'POC name is required'
+  if (!values.clientName.trim()) errors.clientName = 'POC is required'
   if (!values.productName.trim()) errors.productName = 'Product name is required'
+  const email = values.clientUserId.trim()
+  if (!email) errors.clientUserId = 'Email is required'
+  else if (!EMAIL_PATTERN.test(email)) errors.clientUserId = 'Enter a valid email address'
+  if (!values.companyName.trim()) errors.companyName = 'Company is required'
+  if (!values.password) errors.password = 'Password is required'
+  else if (values.password.length < MIN_PASSWORD_LENGTH)
+    errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters`
   if (!values.soldBy.trim()) errors.soldBy = 'Sold by is required'
   if (!values.startDate) errors.startDate = 'Start date is required'
 
@@ -81,12 +90,16 @@ export default function LicenseFormModal({
   useEffect(() => {
     if (!open) return
     setErrors({})
+    setAutoFilled(pocFieldsOf(null))
     setDeactivated(Boolean(license?.deactivated))
     setValues(
       license
         ? {
             clientName: license.clientName || '',
             clientUserId: license.clientUserId || '',
+            companyName: license.companyName || '',
+            // Filled from the POC's account below, once the accounts are loaded.
+            password: '',
             productName: license.productName || '',
             soldBy: license.soldBy || '',
             duration: license.duration || 'custom',
@@ -102,6 +115,42 @@ export default function LicenseFormModal({
     setErrors((prev) => ({ ...prev, [name]: undefined }))
   }
 
+  // Picking an existing POC fills in their email, company and password. Each
+  // field is only replaced while it is empty or still holds what was filled
+  // in this way — never something the admin typed.
+  const [autoFilled, setAutoFilled] = useState(pocFieldsOf(null))
+  const fillFromAccount = (account, extra = {}) => {
+    const next = pocFieldsOf(account)
+    setValues((prev) => {
+      const updates = { ...extra }
+      POC_FIELDS.forEach((f) => {
+        if (!prev[f].trim() || prev[f] === autoFilled[f]) updates[f] = next[f]
+      })
+      return { ...prev, ...updates }
+    })
+    setAutoFilled(next)
+    setErrors((prev) => ({
+      ...prev,
+      clientName: undefined,
+      clientUserId: undefined,
+      companyName: undefined,
+      password: undefined,
+    }))
+  }
+  const setPocName = (name) => {
+    const matches = accountsNamed(clients, name)
+    fillFromAccount(matches.length === 1 ? matches[0] : null, { clientName: name })
+  }
+
+  // Editing: the password lives on the POC's account, not the license, and the
+  // accounts may arrive after the form opens.
+  useEffect(() => {
+    if (!open || !license?.clientUserId) return
+    const account = clients.find((c) => c.hasLogin && sameName(c.username, license.clientUserId))
+    if (!account?.password) return
+    setValues((prev) => (prev.password ? prev : { ...prev, password: account.password }))
+  }, [open, license, clients])
+
   // For a preset duration the expiry is derived; the field becomes read-only.
   const computedExpiry = useMemo(
     () => previewExpiry(values.startDate, values.duration),
@@ -110,27 +159,24 @@ export default function LicenseFormModal({
   const isCustom = values.duration === 'custom'
   const shownExpiry = isCustom ? values.expiryDate : computedExpiry
 
-  // A POC is one person with many licenses. Typing an existing POC's name
-  // links the license to that POC's account, so the Clients page keeps one row
-  // for them and their product login sees the new license.
+  // A POC is one person with many licenses. The email links the license to
+  // that POC's account, so their product login sees the new license.
   const pocNames = useMemo(
     () => [...new Set(clients.map((c) => c.clientName).filter(Boolean))].sort(),
     [clients]
   )
   const pocAccounts = useMemo(
-    () =>
-      clients.filter(
-        (c) => c.hasLogin && c.username && sameName(c.clientName, values.clientName)
-      ),
+    () => accountsNamed(clients, values.clientName),
     [clients, values.clientName]
   )
-  const linkedUserId = resolvePocLink(pocAccounts, values.clientUserId, isEdit ? license : null)
-  const linkedAccount = pocAccounts.find((c) => sameName(c.username, linkedUserId))
+  const email = values.clientUserId.trim().toLowerCase()
+  // Several POCs share this name: the picker below sets the email to one.
+  const chosenAccount = pocAccounts.find((c) => sameName(c.username, email))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     const found = validateForm(values)
-    if (!found.clientName && pocAccounts.length > 1 && !linkedUserId) {
+    if (!found.clientName && pocAccounts.length > 1 && !email) {
       found.clientName = 'More than one POC has this name — choose which one'
     }
     setErrors(found)
@@ -141,9 +187,11 @@ export default function LicenseFormModal({
       await onSubmit(
         {
           clientName: values.clientName.trim(),
-          // The existing POC account this license belongs to, when there is one.
-          // A brand-new POC has none until a login is set up for them.
-          ...(linkedUserId ? { clientUserId: linkedUserId } : {}),
+          // The POC's sign-in for the product. The server saves these on the
+          // POC's account and links the license to it by the email.
+          clientUserId: email,
+          companyName: values.companyName.trim(),
+          password: values.password,
           productName: values.productName.trim(),
           soldBy: values.soldBy.trim(),
           duration: values.duration,
@@ -246,7 +294,7 @@ export default function LicenseFormModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="clientName">
-              POC Name <span className="text-red-500">*</span>
+              POC <span className="text-red-500">*</span>
             </label>
             {/* Typed, with existing POCs suggested: picking one files this
                 license under that POC instead of starting a new one. */}
@@ -257,7 +305,7 @@ export default function LicenseFormModal({
               list="poc-names"
               autoComplete="off"
               value={values.clientName}
-              onChange={(e) => setField('clientName', e.target.value)}
+              onChange={(e) => setPocName(e.target.value)}
             />
             <datalist id="poc-names">
               {pocNames.map((name) => (
@@ -268,11 +316,10 @@ export default function LicenseFormModal({
               <select
                 className="input mt-2"
                 aria-label="Which POC"
-                value={linkedUserId}
-                onChange={(e) => {
-                  setField('clientUserId', e.target.value)
-                  setErrors((prev) => ({ ...prev, clientName: undefined }))
-                }}
+                value={chosenAccount ? chosenAccount.username : ''}
+                onChange={(e) =>
+                  fillFromAccount(pocAccounts.find((c) => c.username === e.target.value))
+                }
               >
                 <option value="">Choose which {values.clientName.trim()}…</option>
                 {pocAccounts.map((c) => (
@@ -283,12 +330,7 @@ export default function LicenseFormModal({
               </select>
             )}
             {fieldError('clientName') ||
-              (linkedAccount && pocAccounts.length === 1 ? (
-                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
-                  Existing POC ·{' '}
-                  {[linkedAccount.companyName, linkedAccount.username].filter(Boolean).join(' · ')}
-                </p>
-              ) : !isEdit && values.clientName.trim() && !pocAccounts.length ? (
+              (!isEdit && values.clientName.trim() && !pocAccounts.length ? (
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">New POC</p>
               ) : null)}
           </div>
@@ -328,7 +370,57 @@ export default function LicenseFormModal({
             )}
           </div>
 
-          <div className="sm:col-span-2">
+          <div>
+            <label className="label" htmlFor="clientUserId">
+              Email <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="clientUserId"
+              type="email"
+              autoComplete="off"
+              className={`input ${errors.clientUserId ? 'border-red-400' : ''}`}
+              placeholder="Email of the point of contact"
+              value={values.clientUserId}
+              onChange={(e) => setField('clientUserId', e.target.value)}
+            />
+            {fieldError('clientUserId')}
+          </div>
+
+          <div>
+            <label className="label" htmlFor="companyName">
+              Company <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="companyName"
+              autoComplete="off"
+              className={`input ${errors.companyName ? 'border-red-400' : ''}`}
+              placeholder="Company of the point of contact"
+              value={values.companyName}
+              onChange={(e) => setField('companyName', e.target.value)}
+            />
+            {fieldError('companyName')}
+          </div>
+
+          {/* Shown in plain text: the admin sets it
+              and reads it back to the POC, who signs in to the product with it. */}
+          <div>
+            <label className="label" htmlFor="password">
+              Password <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="password"
+              type="text"
+              autoComplete="off"
+              spellCheck="false"
+              className={`input ${errors.password ? 'border-red-400' : ''}`}
+              placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+              value={values.password}
+              onChange={(e) => setField('password', e.target.value)}
+            />
+            {fieldError('password')}
+          </div>
+
+          <div>
             <label className="label" htmlFor="soldBy">
               Sold By <span className="text-red-500">*</span>
             </label>

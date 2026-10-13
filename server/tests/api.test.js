@@ -699,6 +699,67 @@ const server = app.listen(0, async () => {
     check('deleting an unknown client -> 404',
       (await call('DELETE', '/api/clients/nope')).status === 404)
 
+    console.log('\n-- POC sign-in from the license form --')
+    const pocLic = (over = {}) => newLicense({
+      clientName: 'Form Poc', clientUserId: 'form.poc@test.com', companyName: 'Form Co',
+      password: 'FormPass123', duration: 'custom', startDate: '2020-01-01', expiryDate: '2099-01-01',
+      ...over,
+    })
+    const formLogin = (password, username = 'form.poc@test.com') =>
+      call('POST', '/api/clients/login', { username, password }, { auth: false, ip: '10.0.0.77' })
+
+    const fromForm = await call('POST', '/api/licenses', pocLic())
+    check('a license with a password is created', fromForm.status === 201, fromForm.body)
+    const formSignIn = await formLogin('FormPass123')
+    check('and the POC can sign in to the product with it',
+      formSignIn.status === 200 &&
+        formSignIn.body.licenses.some((l) => l.licenseKey === fromForm.body.license.licenseKey),
+      formSignIn.body)
+    const formRow = (await call('GET', '/api/clients')).body.clients
+      .filter((c) => c.username === 'form.poc@test.com')
+    check('one POC account holds the company and readable password',
+      formRow.length === 1 && formRow[0].hasLogin && formRow[0].companyName === 'Form Co' &&
+        formRow[0].password === 'FormPass123', formRow)
+
+    const second = await call('POST', '/api/licenses', pocLic({ productName: 'Second Product' }))
+    const formRows = (await call('GET', '/api/clients')).body.clients
+      .filter((c) => c.username === 'form.poc@test.com')
+    check('a second license for the same POC reuses the account',
+      second.status === 201 && formRows.length === 1 && formRows[0].totalLicenses === 2, formRows)
+
+    const repass = await call('PUT', `/api/licenses/${fromForm.body.license.id}`,
+      pocLic({ password: 'NewFormPass1' }))
+    check('editing the license changes the POC password', repass.status === 200 &&
+      (await formLogin('NewFormPass1')).status === 200 &&
+      (await formLogin('FormPass123')).status === 401)
+
+    const emailMoved = await call('PUT', `/api/licenses/${fromForm.body.license.id}`,
+      pocLic({ clientUserId: 'form.poc.new@test.com', password: 'NewFormPass1' }))
+    const movedRows = (await call('GET', '/api/clients')).body.clients
+      .filter((c) => (c.clientName || '') === 'Form Poc')
+    check('changing the email moves the account rather than adding one',
+      emailMoved.status === 200 && movedRows.length === 1 &&
+        movedRows[0].username === 'form.poc.new@test.com' && movedRows[0].totalLicenses === 2,
+      movedRows)
+    check('and the POC signs in with the new email',
+      (await formLogin('NewFormPass1', 'form.poc.new@test.com')).status === 200)
+
+    check('a short password is refused',
+      (await call('POST', '/api/licenses', pocLic({ password: 'short' }))).status === 400)
+    check('a password with a non-email is refused',
+      (await call('POST', '/api/licenses', pocLic({ clientUserId: 'not-an-email' }))).status === 400)
+    check('a password without a company is refused',
+      (await call('POST', '/api/licenses', pocLic({ companyName: '' }))).status === 400)
+    const clash = await call('POST', '/api/licenses',
+      pocLic({ clientName: 'Other Poc', clientUserId: 'other@test.com', companyName: 'Form Co' }))
+    check("another POC cannot take this POC's company", clash.status === 409, clash.body)
+
+    await call('DELETE', `/api/licenses/${fromForm.body.license.id}`)
+    await call('DELETE', `/api/licenses/${second.body.license.id}`)
+    const formAccount = (await call('GET', '/api/clients')).body.clients
+      .find((c) => c.username === 'form.poc.new@test.com')
+    await call('DELETE', `/api/clients/${formAccount.id}`)
+
     console.log('\n-- update + delete --')
     const upd = await call('PUT', `/api/licenses/${lic.id}`, { soldBy: 'Dana Seller', duration: '1_month' })
     check('updates fields', upd.body.license.soldBy === 'Dana Seller', upd.body)

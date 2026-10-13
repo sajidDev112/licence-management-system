@@ -184,6 +184,39 @@ async function updateClient(id, { clientName, companyName, username, password })
   return toPublicClient(await ref.get(), { includePassword: true });
 }
 
+/**
+ * Creates or updates the POC account a license is filed under, from the
+ * license form — which is where POC credentials are now entered.
+ *
+ * The account is found by the license's email. When none has that email but
+ * the license was already filed under another one, that account is the POC
+ * being edited, so it takes the new email (and its licenses follow) rather
+ * than a second account being created for the same person.
+ */
+async function savePocAccount({ clientName, companyName, email, password, previousEmail }) {
+  const username = normalizeUsername(email);
+  if (!username) throw new ApiError(400, 'Email is required', 'EMAIL_REQUIRED');
+  if (!String(companyName || '').trim()) {
+    throw new ApiError(400, 'Company name is required', 'COMPANY_REQUIRED');
+  }
+
+  let doc = await findByUsername(username);
+  if (!doc && previousEmail && normalizeUsername(previousEmail) !== username) {
+    doc = await findByUsername(previousEmail);
+  }
+
+  if (!doc) return createClient({ clientName, companyName, username, password });
+
+  const data = doc.data();
+  return updateClient(doc.id, {
+    clientName,
+    companyName,
+    username,
+    // Re-hashing an unchanged password costs a bcrypt round for nothing.
+    ...(password && password !== data.password ? { password } : {}),
+  });
+}
+
 async function deleteClient(id) {
   const ref = collection().doc(id);
   const doc = await ref.get();
@@ -337,6 +370,7 @@ module.exports = {
   createClient,
   getClientById,
   updateClient,
+  savePocAccount,
   deleteClient,
   listClients,
   login,

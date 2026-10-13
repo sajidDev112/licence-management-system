@@ -8,6 +8,7 @@ const { validate } = require('../middleware/validate');
 const { requireAdmin } = require('../middleware/auth');
 const { verifyLimiter } = require('../middleware/rateLimiter');
 const { DURATION_KEYS } = require('../utils/licenseDates');
+const { MIN_PASSWORD_LENGTH } = require('../services/clientService');
 
 const router = express.Router();
 
@@ -39,6 +40,25 @@ const isoDate = (field, label, { optional = false } = {}) => {
     .isISO8601()
     .withMessage(`${label} must be a valid date`);
 };
+
+// The POC's product sign-in, entered on the license form. Optional on the wire
+// so a license can still be saved without touching the account; when it is
+// sent, the email it signs in with has to be a real address.
+const pocLogin = [
+  body('password')
+    .optional({ values: 'falsy' })
+    .isString()
+    .isLength({ min: MIN_PASSWORD_LENGTH, max: 128 })
+    .withMessage(`Password must be between ${MIN_PASSWORD_LENGTH} and 128 characters`),
+  body('clientUserId')
+    .if(body('password').notEmpty())
+    .isEmail()
+    .withMessage('Enter a valid email address'),
+  body('companyName')
+    .if(body('password').notEmpty())
+    .notEmpty()
+    .withMessage('Company name is required'),
+];
 
 const keyCheck = [
   body('licenseKey')
@@ -138,6 +158,7 @@ router.post(
     isoDate('startDate', 'Start date'),
     // Only required for the custom duration; the service enforces that.
     isoDate('expiryDate', 'Expiry date', { optional: true }),
+    ...pocLogin,
   ],
   validate,
   controller.create
@@ -157,6 +178,7 @@ router.put(
     duration({ optional: true }),
     isoDate('startDate', 'Start date', { optional: true }),
     isoDate('expiryDate', 'Expiry date', { optional: true }),
+    ...pocLogin,
   ],
   validate,
   controller.update
