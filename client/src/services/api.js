@@ -101,9 +101,6 @@ export const productApi = {
 
 export const clientApi = {
   list: () => client.get('/clients').then((r) => r.data.clients),
-  create: (payload) => client.post('/clients', payload).then((r) => r.data.client),
-  update: (id, payload) => client.put(`/clients/${id}`, payload).then((r) => r.data.client),
-  remove: (id) => client.delete(`/clients/${id}`).then((r) => r.data),
 }
 
 export const brandingApi = {
