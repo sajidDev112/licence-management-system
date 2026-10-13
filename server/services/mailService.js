@@ -83,7 +83,9 @@ function buildRows(license) {
   return [
     ['License Key', license.licenseKey],
     ['Product', license.productName],
-    ['Client', license.clientName],
+    ['POC', license.clientName],
+    // The POC's email is stored as the license's user ID.
+    ['Email', license.clientUserId || '-'],
     ['Company', license.companyName],
     ['Sold By', license.soldBy || '-'],
     ['Start Date', formatDate(license.startDate)],
