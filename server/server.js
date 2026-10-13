@@ -84,7 +84,11 @@ const configuredOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
 function developmentLanOrigins() {
   if (process.env.NODE_ENV === 'production') return [];
   const webPort = process.env.WEB_DEV_PORT || 5173;
-  return lanAddresses().flatMap((ip) => [`http://${ip}:${webPort}`, `http://${ip}:${PORT}`]);
+  // localhost and 127.0.0.1 are different origins to a browser, so both count.
+  return ['localhost', '127.0.0.1', ...lanAddresses()].flatMap((ip) => [
+    `http://${ip}:${webPort}`,
+    `http://${ip}:${PORT}`,
+  ]);
 }
 
 const allowedOrigins = [...new Set([...configuredOrigins, ...developmentLanOrigins()])];
@@ -97,12 +101,25 @@ const PUBLIC_PATHS = [
   '/clients/login',
 ];
 
-const adminCors = cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new ApiError(403, 'Origin not allowed', 'CORS_NOT_ALLOWED'));
-  },
-  credentials: true,
+/**
+ * The dashboard this server serves itself is same-origin, whatever host it was
+ * opened by (localhost, an IP, a custom domain) — browsers still send Origin
+ * on a POST, and that must never be refused.
+ */
+function isSameOrigin(req, origin) {
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch {
+    return false;
+  }
+}
+
+const adminCors = cors((req, callback) => {
+  const origin = req.headers.origin;
+  if (!origin || allowedOrigins.includes(origin) || isSameOrigin(req, origin)) {
+    return callback(null, { origin: true, credentials: true });
+  }
+  return callback(new ApiError(403, 'Origin not allowed', 'CORS_NOT_ALLOWED'));
 });
 
 const publicCors = cors({ origin: '*' });

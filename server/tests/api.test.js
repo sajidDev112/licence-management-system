@@ -839,6 +839,10 @@ const server = app.listen(0, async () => {
     check('sync reachable from a foreign origin', foreignSync.status === 404)
     check('admin API rejects an unknown origin',
       (await call('GET', '/api/licenses', null, { origin: 'https://evil.example.com' })).status === 403)
+    // The dashboard Express serves itself is same-origin even when that origin
+    // is not in CORS_ORIGIN, so its sign-in must not be refused.
+    check('admin API accepts the dashboard it serves itself',
+      (await call('GET', '/api/licenses', null, { origin: base })).status === 200)
 
     console.log('\n-- rate limiting --')
     let limited = false
