@@ -123,6 +123,14 @@ export default function AdminLayout() {
   // Route changes should never leave the mobile drawer hanging open.
   useEffect(() => setMobileOpen(false), [location.pathname])
 
+  // Escape closes the open drawer, as it would any other overlay.
+  useEffect(() => {
+    if (!mobileOpen) return undefined
+    const onKey = (e) => e.key === 'Escape' && setMobileOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mobileOpen])
+
   return (
     <div className="min-h-screen lg:flex">
       {/* Sticky and exactly viewport-tall, so Settings and the admin block stay
@@ -135,6 +143,17 @@ export default function AdminLayout() {
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/50" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 flex h-full w-64 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+            {/* Vertically centred on the logo row (py-5 around an h-10 logo). */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close navigation"
+              className="absolute right-3 top-[22px] rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
             <SidebarBody onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
