@@ -13,6 +13,9 @@ import { authApi, brandingApi, emailApi } from '../services/api'
 const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
 const MAX_LOGO_BYTES = 500 * 1024
 
+// Sizing shared by the branding buttons so the row never wraps (see BrandingSettings).
+const LOGO_BUTTON = 'flex-1 whitespace-nowrap px-2 text-xs sm:flex-none sm:px-4 sm:text-sm'
+
 function readAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -107,9 +110,14 @@ function BrandingSettings() {
       )}
       {error && <p className="text-xs font-medium text-red-600 dark:text-red-400">{error}</p>}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="btn-secondary cursor-pointer">
-          Choose image
+      {/* Kept on one row at every width: on phones the buttons share the row
+          equally with tighter padding, and below 360px the labels drop their
+          second word so all three still fit. */}
+      <div className="flex flex-nowrap items-center gap-2">
+        <label className={`btn-secondary cursor-pointer ${LOGO_BUTTON}`}>
+          <span>
+            Choose<span className="hidden min-[360px]:inline"> image</span>
+          </span>
           <input
             type="file"
             accept={ALLOWED_LOGO_TYPES.join(',')}
@@ -118,14 +126,27 @@ function BrandingSettings() {
           />
         </label>
 
-        <button type="button" className="btn-primary" onClick={handleSave} disabled={!preview || saving}>
-          {saving ? 'Saving...' : 'Save Logo'}
+        <button
+          type="button"
+          className={`btn-primary ${LOGO_BUTTON}`}
+          onClick={handleSave}
+          disabled={!preview || saving}
+        >
+          {saving ? (
+            'Saving...'
+          ) : (
+            <>
+              <span>
+                Save<span className="hidden min-[360px]:inline"> Logo</span>
+              </span>
+            </>
+          )}
         </button>
 
         {preview && (
           <button
             type="button"
-            className="btn-secondary"
+            className={`btn-secondary ${LOGO_BUTTON}`}
             onClick={() => {
               setPreview(null)
               setFileName('')
@@ -140,11 +161,19 @@ function BrandingSettings() {
         {logo && !preview && (
           <button
             type="button"
-            className="btn-danger-outline"
+            className={`btn-danger-outline ${LOGO_BUTTON}`}
             onClick={handleRemove}
             disabled={removing}
           >
-            {removing ? 'Removing...' : 'Remove Logo'}
+            {removing ? (
+              'Removing...'
+            ) : (
+              <>
+                <span>
+                  Remove<span className="hidden min-[360px]:inline"> Logo</span>
+                </span>
+              </>
+            )}
           </button>
         )}
       </div>
