@@ -157,8 +157,48 @@ export default function Products() {
       )
     }
 
+    const openEdit = (product) => {
+      setEditing(product)
+      setFormOpen(true)
+    }
+
+    const actions = (product) => (
+      <div className="flex items-center gap-1">
+        <IconButton label="Edit" paths={ACTION_ICONS.edit} onClick={() => openEdit(product)} />
+        <IconButton
+          label="Delete"
+          paths={ACTION_ICONS.delete}
+          tone="danger"
+          onClick={() => setDeleting(product)}
+        />
+      </div>
+    )
+
     return (
-      <div className="overflow-x-auto">
+      <>
+      {/* Phones get stacked cards; the table needs more width than they have. */}
+      <ul className="divide-y divide-slate-100 sm:hidden dark:divide-slate-800">
+        {products.map((product) => (
+          <li key={product.id} className="flex items-start justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="break-words font-medium text-slate-900 dark:text-white">
+                {product.name}
+              </p>
+              <p className="mt-0.5 break-words text-sm text-slate-600 dark:text-slate-300">
+                {product.description || (
+                  <span className="text-slate-400 dark:text-slate-600">No description</span>
+                )}
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Created {formatDate(product.createdAt)}
+              </p>
+            </div>
+            <div className="shrink-0">{actions(product)}</div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden overflow-x-auto sm:block">
         <table className="w-full table-auto text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
             <tr>
@@ -182,29 +222,13 @@ export default function Products() {
                 <td className="whitespace-nowrap px-2 py-3 text-slate-600 dark:text-slate-300">
                   {formatDate(product.createdAt)}
                 </td>
-                <td className="whitespace-nowrap px-2 py-3">
-                  <div className="flex items-center gap-1">
-                    <IconButton
-                      label="Edit"
-                      paths={ACTION_ICONS.edit}
-                      onClick={() => {
-                        setEditing(product)
-                        setFormOpen(true)
-                      }}
-                    />
-                    <IconButton
-                      label="Delete"
-                      paths={ACTION_ICONS.delete}
-                      tone="danger"
-                      onClick={() => setDeleting(product)}
-                    />
-                  </div>
-                </td>
+                <td className="whitespace-nowrap px-2 py-3">{actions(product)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      </>
     )
   }
 
