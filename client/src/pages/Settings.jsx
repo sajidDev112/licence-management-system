@@ -159,7 +159,7 @@ function BrandingSettings() {
 
 function Section({ title, description, children }) {
   return (
-    <section className="card p-5 sm:p-6">
+    <section className="card min-w-0 p-4 sm:p-6">
       <div className="mb-5">
         <h2 className="text-base font-semibold text-slate-900 dark:text-white">{title}</h2>
         {description && (
@@ -458,7 +458,44 @@ function EmailConfiguration() {
           No email IDs configured yet. The first one you add becomes a default.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+        <>
+        {/* Phones get stacked cards; the table needs more width than they have. */}
+        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 sm:hidden dark:divide-slate-800 dark:border-slate-800">
+          {emails.map((item) => (
+            <li key={item.id} className="flex items-start justify-between gap-3 px-3 py-3">
+              <div className="min-w-0">
+                <p className="break-all text-sm font-medium text-slate-900 dark:text-white">
+                  {item.email}
+                </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                  {item.label && (
+                    <span className="text-slate-600 dark:text-slate-300">{item.label}</span>
+                  )}
+                  {item.isDefault ? (
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+                      Default
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                      Not default
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <IconButton label="Edit" paths={ACTION_ICONS.edit} onClick={() => openEdit(item)} />
+                <IconButton
+                  label="Delete"
+                  paths={ACTION_ICONS.delete}
+                  tone="danger"
+                  onClick={() => setDeleting(item)}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <div className="hidden overflow-x-auto rounded-lg border border-slate-200 sm:block dark:border-slate-800">
           <table className="w-full table-auto text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
               <tr>
@@ -513,6 +550,7 @@ function EmailConfiguration() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <EmailFormModal
@@ -560,8 +598,10 @@ export default function Settings() {
         <ThemePillSwitch />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <div className="space-y-6">
+      {/* grid-cols-1 (minmax(0, 1fr)) and min-w-0 stop the email table's width
+          from stretching the grid past the viewport on small screens. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="min-w-0 space-y-6">
           <Section
             title="Branding"
           >
