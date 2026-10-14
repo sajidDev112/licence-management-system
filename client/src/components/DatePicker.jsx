@@ -195,14 +195,14 @@ export default function DatePicker({
         aria-expanded={open}
         className={`input flex items-center justify-between gap-2 text-left ${
           invalid ? 'border-red-400 dark:border-red-500' : ''
-        } ${disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-indigo-400'} ${
-          open ? 'border-indigo-500 ring-2 ring-indigo-100 dark:border-indigo-400 dark:ring-indigo-900/50' : ''
+        } ${disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-brand-400'} ${
+          open ? 'border-brand-500 ring-2 ring-brand-100 dark:border-brand-400 dark:ring-brand-900/50' : ''
         }`}
       >
         <span className={selected ? '' : 'text-slate-400 dark:text-slate-500'}>{label}</span>
         <CalendarIcon
           className={`h-[18px] w-[18px] shrink-0 transition ${
-            open ? 'text-indigo-700 dark:text-indigo-300' : 'text-indigo-600 dark:text-indigo-400'
+            open ? 'text-brand-800 dark:text-brand-300' : 'text-brand-700 dark:text-brand-400'
           }`}
         />
       </button>
@@ -289,9 +289,9 @@ export default function DatePicker({
                     }}
                     className={`h-10 rounded-lg text-sm font-medium transition ${
                       year === view.y
-                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/30 hover:bg-indigo-500'
+                        ? 'bg-brand-500 text-slate-900 shadow-sm shadow-brand-900/30 hover:bg-brand-400'
                         : year === today.y
-                          ? 'text-indigo-600 ring-1 ring-inset ring-indigo-400 hover:bg-indigo-50 dark:text-indigo-300 dark:ring-indigo-500 dark:hover:bg-indigo-500/10'
+                          ? 'text-brand-700 ring-1 ring-inset ring-brand-400 hover:bg-brand-50 dark:text-brand-300 dark:ring-brand-500 dark:hover:bg-brand-400/10'
                           : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -327,11 +327,11 @@ export default function DatePicker({
                     aria-current={isToday ? 'date' : undefined}
                     className={`h-9 rounded-lg text-sm font-medium transition ${
                       isSelected
-                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/30 hover:bg-indigo-500'
+                        ? 'bg-brand-500 text-slate-900 shadow-sm shadow-brand-900/30 hover:bg-brand-400'
                         : blocked
                           ? 'cursor-not-allowed text-slate-300 dark:text-slate-700'
                           : isToday
-                            ? 'text-indigo-600 ring-1 ring-inset ring-indigo-400 hover:bg-indigo-50 dark:text-indigo-300 dark:ring-indigo-500 dark:hover:bg-indigo-500/10'
+                            ? 'text-brand-700 ring-1 ring-inset ring-brand-400 hover:bg-brand-50 dark:text-brand-300 dark:ring-brand-500 dark:hover:bg-brand-400/10'
                             : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -347,7 +347,7 @@ export default function DatePicker({
                 type="button"
                 onClick={() => pick(today.y, today.m, today.d)}
                 disabled={isBlocked(today.y, today.m, today.d)}
-                className="rounded-lg px-2 py-1 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent dark:text-indigo-400 dark:hover:bg-indigo-500/10 dark:disabled:text-slate-600"
+                className="rounded-lg px-2 py-1 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent dark:text-brand-400 dark:hover:bg-brand-400/10 dark:disabled:text-slate-600"
               >
                 Today
               </button>

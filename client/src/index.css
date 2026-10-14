@@ -21,9 +21,11 @@
       transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed
       disabled:opacity-60 dark:focus:ring-offset-slate-900;
   }
+  /* Brand #50C7D4. The text is dark, not white: white on this cyan is about
+     2:1 contrast, which is unreadable at button sizes. Dark slate gives ~8:1. */
   .btn-primary {
-    @apply btn bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500
-      dark:bg-indigo-500 dark:hover:bg-indigo-400;
+    @apply btn bg-brand-500 text-slate-900 hover:bg-brand-600 focus:ring-brand-400
+      dark:bg-brand-500 dark:text-slate-900 dark:hover:bg-brand-400;
   }
   .btn-secondary {
     @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-400
@@ -41,10 +43,10 @@
   }
   .input {
     @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm
-      outline-none transition placeholder:text-slate-400 focus:border-indigo-500
-      focus:ring-2 focus:ring-indigo-100
+      outline-none transition placeholder:text-slate-400 focus:border-brand-500
+      focus:ring-2 focus:ring-brand-100
       dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500
-      dark:focus:border-indigo-400 dark:focus:ring-indigo-900/50;
+      dark:focus:border-brand-400 dark:focus:ring-brand-900/50;
   }
   .label {
     @apply mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300;

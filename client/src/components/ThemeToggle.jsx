@@ -38,16 +38,16 @@ export function ThemePillSwitch({ className = '' }) {
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       onClick={toggle}
-      className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
-        isDark ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+      className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
+        isDark ? 'bg-brand-700' : 'bg-slate-300 dark:bg-slate-700'
       } ${className}`}
     >
       {/* The icon stays on the side the knob is not occupying. In dark mode it
-          sits on the indigo track so it is white; in light mode the track is
-          neutral, so it takes the theme indigo to stay legible. */}
+          sits on the brand track so it is white; in light mode the track is
+          neutral, so it takes the brand colour to stay legible. */}
       <span
         className={`pointer-events-none absolute top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center transition-all ${
-          isDark ? 'left-1 text-white' : 'right-1 text-indigo-600 dark:text-indigo-400'
+          isDark ? 'left-1 text-white' : 'right-1 text-brand-700 dark:text-brand-400'
         }`}
       >
         <svg

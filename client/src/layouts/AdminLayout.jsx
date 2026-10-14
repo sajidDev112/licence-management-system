@@ -11,8 +11,11 @@ const ICONS = {
     'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z',
   products:
     'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+  // An outlined cog, drawn hollow so the sidebar shows through it. Sized to
+  // ink the same height as the sign-out glyph beside it, rather than to fill
+  // the icon box — otherwise it reads noticeably larger.
   settings:
-    'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
+    'M9.81 6.31 L10.4 3.75 L13.6 3.75 L14.19 6.31 L14.48 6.43 L16.7 5.04 L18.96 7.3 L17.57 9.52 L17.69 9.81 L20.25 10.4 L20.25 13.6 L17.69 14.19 L17.57 14.48 L18.96 16.7 L16.7 18.96 L14.48 17.57 L14.19 17.69 L13.6 20.25 L10.4 20.25 L9.81 17.69 L9.52 17.57 L7.3 18.96 L5.04 16.7 L6.43 14.48 L6.31 14.19 L3.75 13.6 L3.75 10.4 L6.31 9.81 L6.43 9.52 L5.04 7.3 L7.3 5.04 L9.52 6.43 Z M9.5 12a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0Z',
   signOut: 'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
 }
 
@@ -25,9 +28,13 @@ const MAIN_NAV = [
 const linkClasses = ({ isActive }) =>
   `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
     isActive
-      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
+      ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/10 dark:text-brand-300'
       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
   }`
+
+/** Shared shape of the Settings and Log Out buttons at the foot of the sidebar. */
+const FOOTER_BUTTON =
+  'flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-2 py-2 text-sm font-medium transition'
 
 function NavIcon({ d }) {
   return (
@@ -44,7 +51,7 @@ function Logo({ onNavigate }) {
       to="/"
       onClick={onNavigate}
       aria-label="Go to Dashboard"
-      className="block rounded-lg px-6 py-5 transition hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+      className="block rounded-lg px-6 py-5 transition hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
       <BrandLogo className="h-10 w-auto" />
     </Link>
@@ -53,7 +60,7 @@ function Logo({ onNavigate }) {
 
 /** Sidebar body: main navigation at the top, Settings pinned to the bottom. */
 function SidebarBody({ onNavigate }) {
-  const { signOut } = useAuth()
+  const { admin, signOut } = useAuth()
 
   return (
     <>
@@ -75,23 +82,28 @@ function SidebarBody({ onNavigate }) {
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-slate-200 px-3 py-3 dark:border-slate-800">
-        <div className="mb-2.5 text-center">
-          <p className="truncate text-xs font-medium text-slate-700 dark:text-slate-300">Admin</p>
-          <p className="truncate text-xs text-slate-400 dark:text-slate-500">OpEzee</p>
+      <div className="mt-auto border-t border-slate-200 px-4 py-4 dark:border-slate-800">
+        <div className="mb-3 min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">Admin</p>
+          <p
+            className="truncate text-xs text-slate-500 dark:text-slate-400"
+            title={admin?.email || undefined}
+          >
+            {admin?.email || 'Signed in'}
+          </p>
         </div>
 
-        {/* Settings and Log Out share one row, so both are sized to their
-            content rather than filling the sidebar. */}
-        <div className="flex items-center justify-center gap-2">
+        {/* Two equal outlined buttons sharing the row. Log Out is in red: it is
+            the one destructive action in the sidebar. */}
+        <div className="grid grid-cols-2 gap-2">
           <NavLink
             to="/settings"
             onClick={onNavigate}
             className={({ isActive }) =>
-              `flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium transition ${
+              `${FOOTER_BUTTON} ${
                 isActive
-                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
+                  ? 'border-brand-400 text-brand-700 dark:border-brand-500/60 dark:text-brand-400'
+                  : 'border-slate-300 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
               }`
             }
           >
@@ -99,13 +111,11 @@ function SidebarBody({ onNavigate }) {
             Settings
           </NavLink>
 
-          {/* Mirrors the Settings link's sizing so the two sit level, but in
-              red: signing out is the one destructive action in the sidebar. */}
           <button
             type="button"
             onClick={signOut}
             aria-label="Log out"
-            className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+            className={`${FOOTER_BUTTON} border-slate-300 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 dark:border-slate-700 dark:text-red-400 dark:hover:border-red-500/40 dark:hover:bg-red-500/10 dark:hover:text-red-300`}
           >
             <NavIcon d={ICONS.signOut} />
             Log Out
@@ -148,7 +158,7 @@ export default function AdminLayout() {
               type="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation"
-              className="absolute right-3 top-[22px] rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+              className="absolute right-3 top-[22px] rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

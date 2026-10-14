@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-/** Monospace license key with a one-click copy affordance. */
+/** Monospace license key with a one-click copy button. */
 export default function LicenseKey({ value, onCopied, size = 'sm', showLabel = true }) {
   const [copied, setCopied] = useState(false)
 
@@ -34,13 +34,42 @@ export default function LicenseKey({ value, onCopied, size = 'sm', showLabel = t
     >
       {value}
       {showLabel && (
-      <span
-        className={`font-sans text-[10px] font-medium ${
-          copied ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
-        }`}
-      >
-        {copied ? 'Copied' : 'Copy'}
-      </span>
+        <span
+          className={`shrink-0 transition ${
+            copied ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
+          }`}
+          aria-hidden="true"
+        >
+          {copied ? (
+            // A tick for the moment after copying, so the button still says
+            // something happened now that the word "Copied" is gone.
+            <svg
+              className={size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            // Two overlapping sheets: the back one is drawn as an open path so
+            // the front one sits over it rather than crossing its outline.
+            <svg
+              className={size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="1.9"
+            >
+              <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.6" />
+              <path
+                strokeLinecap="round"
+                d="M15.5 8.5V6.6A2.6 2.6 0 0 0 12.9 4H6.6A2.6 2.6 0 0 0 4 6.6v6.3A2.6 2.6 0 0 0 6.6 15.5H8.5"
+              />
+            </svg>
+          )}
+        </span>
       )}
     </button>
   )

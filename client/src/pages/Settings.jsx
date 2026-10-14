@@ -25,9 +25,21 @@ function readAsDataUrl(file) {
   })
 }
 
+const LOGO_EXTENSIONS = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' }
+
+/**
+ * The file name a downloaded logo is saved as: the name it was uploaded under,
+ * or "logo" with the extension its image type calls for when that is unknown.
+ */
+function logoDownloadName(dataUrl, fileName) {
+  if (fileName) return fileName
+  const mimeType = /^data:([^;,]+)/.exec(dataUrl || '')?.[1]
+  return `logo.${LOGO_EXTENSIONS[mimeType] || 'png'}`
+}
+
 function BrandingSettings() {
   const toast = useToast()
-  const { logo, setLogo, refresh } = useBranding()
+  const { logo, logoFileName, setLogo, refresh } = useBranding()
   const [preview, setPreview] = useState(null)
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
@@ -65,7 +77,7 @@ function BrandingSettings() {
     try {
       const branding = await brandingApi.setLogo({ logo: preview, fileName })
       // Update the context directly so the sidebar changes without a reload.
-      setLogo(branding.logo)
+      setLogo(branding.logo, branding.fileName)
       setPreview(null)
       setFileName('')
       toast.success('Logo updated successfully')
@@ -91,6 +103,16 @@ function BrandingSettings() {
     }
   }
 
+  // The stored logo is a data URL, so a plain download link saves it as-is.
+  const handleDownload = () => {
+    const link = document.createElement('a')
+    link.href = logo
+    link.download = logoDownloadName(logo, logoFileName)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex min-h-[5.5rem] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
@@ -104,7 +126,7 @@ function BrandingSettings() {
       </div>
 
       {preview && (
-        <p className="text-xs text-indigo-600 dark:text-indigo-400">
+        <p className="text-xs text-brand-700 dark:text-brand-400">
           Previewing {fileName || 'the selected file'} — not saved yet.
         </p>
       )}
@@ -112,7 +134,9 @@ function BrandingSettings() {
 
       {/* Kept on one row at every width: on phones the buttons share the row
           equally with tighter padding, and below 360px the labels drop their
-          second word so all three still fit. */}
+          second word so they still fit. Only the buttons that apply show:
+          a saved logo offers Remove and Download, an unsaved image offers
+          Save and Cancel, and no logo at all offers just Choose. */}
       <div className="flex flex-nowrap items-center gap-2">
         <label className={`btn-secondary cursor-pointer ${LOGO_BUTTON}`}>
           <span>
@@ -126,22 +150,22 @@ function BrandingSettings() {
           />
         </label>
 
-        <button
-          type="button"
-          className={`btn-primary ${LOGO_BUTTON}`}
-          onClick={handleSave}
-          disabled={!preview || saving}
-        >
-          {saving ? (
-            'Saving...'
-          ) : (
-            <>
+        {preview && (
+          <button
+            type="button"
+            className={`btn-primary ${LOGO_BUTTON}`}
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              'Saving...'
+            ) : (
               <span>
                 Save<span className="hidden min-[360px]:inline"> Logo</span>
               </span>
-            </>
-          )}
-        </button>
+            )}
+          </button>
+        )}
 
         {preview && (
           <button
@@ -169,12 +193,32 @@ function BrandingSettings() {
               'Removing...'
             ) : (
               <>
+                {/* A cross in a circle. */}
+                <svg
+                  className="h-4 w-4 shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l6 6m0-6l-6 6" />
+                </svg>
                 <span>
                   Remove<span className="hidden min-[360px]:inline"> Logo</span>
                 </span>
               </>
             )}
           </button>
+        )}
+
+        {/* Pushed to the far right, under the preview's corner. Only the
+            saved logo can be downloaded, not an unsaved preview. */}
+        {logo && !preview && (
+          <div className="ml-auto shrink-0">
+            <IconButton label="Download logo" paths={ACTION_ICONS.download} onClick={handleDownload} />
+          </div>
         )}
       </div>
 
@@ -369,7 +413,7 @@ function EmailFormModal({ open, item, onClose, onSubmit }) {
           <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-3 py-2.5 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/60">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
               checked={values.isDefault}
               onChange={(e) => setField('isDefault', e.target.checked)}
             />
@@ -471,8 +515,13 @@ function EmailConfiguration() {
   return (
     <>
       <div className="mb-4 flex justify-end">
+        {/* A drawn plus rather than the text character, which rendered small
+            and thin. Matches the Add Product and Create License buttons. */}
         <button type="button" className="btn-primary" onClick={openAdd}>
-          + Add Email
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Add Email
         </button>
       </div>
 
@@ -501,7 +550,7 @@ function EmailConfiguration() {
                     <span className="text-slate-600 dark:text-slate-300">{item.label}</span>
                   )}
                   {item.isDefault ? (
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+                    <span className="rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-800 dark:bg-brand-500/10 dark:text-brand-400">
                       Default
                     </span>
                   ) : (
@@ -550,7 +599,7 @@ function EmailConfiguration() {
                   </td>
                   <td className="whitespace-nowrap px-2 py-3">
                     {item.isDefault ? (
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-800 dark:bg-brand-500/10 dark:text-brand-400">
                         Default
                       </span>
                     ) : (

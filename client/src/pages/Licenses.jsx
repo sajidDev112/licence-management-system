@@ -183,7 +183,7 @@ export default function Licenses() {
       <Modal
         open={Boolean(created)}
         title="License created"
-        subtitle="Share this key with your client. They will enter it in your product."
+        subtitle="Share this license key with your client for product activation."
         onClose={() => setCreated(null)}
         maxWidth="max-w-md"
       >
