@@ -8,13 +8,20 @@ const BrandingContext = createContext(null)
  * bundled into the build, so it can be changed from Settings without a redeploy.
  */
 export function BrandingProvider({ children }) {
-  const [logo, setLogo] = useState(null)
+  const [logo, setLogoState] = useState(null)
+  // The name the logo was uploaded under, so a download saves as that file.
+  const [logoFileName, setLogoFileName] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  const setLogo = useCallback((next, fileName = null) => {
+    setLogoState(next)
+    setLogoFileName(next ? fileName : null)
+  }, [])
 
   const load = useCallback(async () => {
     try {
       const branding = await brandingApi.get()
-      setLogo(branding?.logo || null)
+      setLogo(branding?.logo || null, branding?.fileName || null)
     } catch {
       // A missing logo is cosmetic — fall back to the wordmark and carry on.
       setLogo(null)
@@ -28,8 +35,8 @@ export function BrandingProvider({ children }) {
   }, [load])
 
   const value = useMemo(
-    () => ({ logo, loading, setLogo, refresh: load }),
-    [logo, loading, load]
+    () => ({ logo, logoFileName, loading, setLogo, refresh: load }),
+    [logo, logoFileName, loading, setLogo, load]
   )
 
   return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>
