@@ -25,7 +25,7 @@ export default function Dashboard() {
           <StatCard
             label="Total Clients"
             value={stats.totalClients}
-            tone="indigo"
+            tone="brand"
             icon={STAT_ICONS.clients}
             loading={loading}
           />

@@ -1,5 +1,5 @@
 const TONES = {
-  indigo: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400',
+  brand: 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400',
   emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
   red: 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400',
   slate: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',

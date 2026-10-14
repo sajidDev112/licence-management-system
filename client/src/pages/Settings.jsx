@@ -104,7 +104,7 @@ function BrandingSettings() {
       </div>
 
       {preview && (
-        <p className="text-xs text-indigo-600 dark:text-indigo-400">
+        <p className="text-xs text-brand-700 dark:text-brand-400">
           Previewing {fileName || 'the selected file'} — not saved yet.
         </p>
       )}
@@ -369,7 +369,7 @@ function EmailFormModal({ open, item, onClose, onSubmit }) {
           <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-3 py-2.5 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/60">
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
               checked={values.isDefault}
               onChange={(e) => setField('isDefault', e.target.checked)}
             />
@@ -501,7 +501,7 @@ function EmailConfiguration() {
                     <span className="text-slate-600 dark:text-slate-300">{item.label}</span>
                   )}
                   {item.isDefault ? (
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+                    <span className="rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-800 dark:bg-brand-500/10 dark:text-brand-400">
                       Default
                     </span>
                   ) : (
@@ -550,7 +550,7 @@ function EmailConfiguration() {
                   </td>
                   <td className="whitespace-nowrap px-2 py-3">
                     {item.isDefault ? (
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-800 dark:bg-brand-500/10 dark:text-brand-400">
                         Default
                       </span>
                     ) : (
