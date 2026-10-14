@@ -427,7 +427,7 @@ export default function LicenseFormModal({
             <input
               id="soldBy"
               className={`input ${errors.soldBy ? 'border-red-400' : ''}`}
-              placeholder="Name of the person who sold this license"
+              placeholder="John Doe"
               value={values.soldBy}
               onChange={(e) => setField('soldBy', e.target.value)}
             />
