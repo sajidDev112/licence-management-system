@@ -12,6 +12,16 @@ export function formatDate(value) {
   return `${String(d.getUTCDate()).padStart(2, '0')} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
 }
 
+/** "23-09-2027" — the product-facing details page, as products print it. */
+export function formatDateNumeric(value) {
+  if (!value) return '-'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '-'
+  const dd = String(d.getUTCDate()).padStart(2, '0')
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+  return `${dd}-${mm}-${d.getUTCFullYear()}`
+}
+
 /** Value for an <input type="date">. */
 export function toDateInput(value) {
   if (!value) return ''

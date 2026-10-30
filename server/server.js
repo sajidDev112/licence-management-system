@@ -38,22 +38,49 @@ app.set('trust proxy', 1);
 // The dashboard is served from this same server in production, so the default
 // policy is relaxed exactly where that build needs it: the inline theme script
 // in index.html, Google Fonts, and logos stored as data URLs.
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
-        imgSrc: ["'self'", 'data:', 'blob:'],
-        connectSrc: ["'self'"],
-        objectSrc: ["'none'"],
-      },
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'", "'unsafe-inline'"],
+  styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+  fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+  imgSrc: ["'self'", 'data:', 'blob:'],
+  connectSrc: ["'self'"],
+  objectSrc: ["'none'"],
+};
+
+const strictHeaders = helmet({
+  contentSecurityPolicy: { directives: cspDirectives },
+  // Fonts and images are loaded cross-origin by the built dashboard.
+  crossOriginEmbedderPolicy: false,
+});
+
+/**
+ * The /client pages are the product-facing sign-in and license screens, and
+ * a product shows them inside a frame — an installed Electron app from
+ * file://, whose origin no frame-ancestors list can name. So those pages, and
+ * only those, may be framed: by anything, or by CLIENT_FRAME_ANCESTORS when it
+ * is set. The admin console keeps refusing to be framed.
+ */
+const clientFrameAncestors = (process.env.CLIENT_FRAME_ANCESTORS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const frameableHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...cspDirectives,
+      frameAncestors: clientFrameAncestors.length ? clientFrameAncestors : null,
     },
-    // Fonts and images are loaded cross-origin by the built dashboard.
-    crossOriginEmbedderPolicy: false,
-  })
+  },
+  crossOriginEmbedderPolicy: false,
+  frameguard: false,
+});
+
+const isClientPage = (p) => p === '/client' || p.startsWith('/client/');
+
+app.use((req, res, next) =>
+  isClientPage(req.path) ? frameableHeaders(req, res, next) : strictHeaders(req, res, next)
 );
 
 // A logo upload is a base64 image and legitimately exceeds the request size

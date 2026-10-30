@@ -15,6 +15,10 @@
       (function () {
         try {
           var saved = localStorage.getItem("lm.theme");
+          // A product embedding the /client pages names its own theme.
+          var asked = location.pathname.indexOf("/client") === 0 &&
+            new URLSearchParams(location.search).get("theme");
+          if (asked === "dark" || asked === "light") saved = asked;
           var dark = saved
             ? saved === "dark"
             : window.matchMedia("(prefers-color-scheme: dark)").matches;

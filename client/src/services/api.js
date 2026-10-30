@@ -103,6 +103,28 @@ export const clientApi = {
   list: () => client.get('/clients').then((r) => r.data.clients),
 }
 
+/**
+ * The product-facing endpoints, called by the /client pages a product embeds.
+ * A separate instance on purpose: these calls must never carry an admin token,
+ * and a 401 from a wrong product password must not sign an admin out.
+ */
+const publicClient = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 20000,
+})
+
+publicClient.interceptors.response.use(
+  (response) => response,
+  (error) => Promise.reject(toFriendlyError(error))
+)
+
+export const productClientApi = {
+  login: (payload) => publicClient.post('/clients/login', payload).then((r) => r.data),
+  verify: (payload) => publicClient.post('/licenses/verify', payload).then((r) => r.data),
+  sync: (payload) => publicClient.post('/licenses/sync', payload).then((r) => r.data),
+}
+
 export const brandingApi = {
   get: () => client.get('/admin/branding').then((r) => r.data.branding),
   setLogo: (payload) => client.put('/admin/branding', payload).then((r) => r.data.branding),

@@ -39,6 +39,7 @@ Your product never touches Firebase, and never needs an admin token. It only cal
   - [1. Check a key is valid](#1-check-a-key-is-valid)
   - [2. Re-check hourly (auto-sync)](#2-re-check-hourly-auto-sync)
   - [3. Check login credentials](#3-check-login-credentials)
+  - [4. Hosted license screens](#4-hosted-license-screens)
 - [One machine per license](#one-machine-per-license)
 - [Security](#security)
 - [Deploying to Render](#deploying-to-render)
@@ -1295,6 +1296,36 @@ Notes for your product:
   cannot be patched out in a client.
 - On a network failure, keep the last known good state for a grace period rather
   than locking the user out — but do not cache a success indefinitely.
+
+### 4. Hosted license screens
+
+Instead of drawing its own sign-in and license screens, a product can show these
+public pages in a frame (or open them in a browser). Each page validates its input
+and calls the endpoints above itself:
+
+| Page | Calls | For |
+|---|---|---|
+| `/client/login` | `POST /api/clients/login` | The POC signs in |
+| `/client/activate` | `POST /api/licenses/verify` | Enter the key; binds it to the machine |
+| `/client/status` | `POST /api/licenses/sync` | Expired / deactivated notice, with Reactivate and Check again |
+| `/client/details` | `POST /api/licenses/verify` | The license record, read-only |
+
+The product describes itself in the query string — `product`, `machine`, and later
+`key`, `email`, `poc`, `company`; `theme=dark|light` matches its look without
+touching the console's saved theme. In development they are on the Vite port, e.g.
+`http://192.168.68.106:5173/client/login?product=Match%20Match&machine=1234`.
+
+In a frame, each page reports to the product with `postMessage`
+(`{ source: 'opezee-licence', type, ... }`): `ready`, `login` (who signed in — never
+the password), `activated` (the key and the server's verdict), `reactivate`,
+`signOut` and `close`. A product should treat `activated` as a request and verify
+the key again itself before unlocking. The contract is documented in
+`client/src/services/productLink.js`. Opened on their own, the pages link to each
+other instead, so the flow can be tried in a browser.
+
+Only `/client/*` may be framed; the admin console still refuses it. Set
+`CLIENT_FRAME_ANCESTORS` to limit which sites may frame them. Leave it blank for an
+installed desktop app, which loads from `file://`.
 
 ---
 
